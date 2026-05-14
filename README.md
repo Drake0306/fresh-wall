@@ -79,6 +79,46 @@ fresh-wall/
    so it works out of the box. Before publishing, swap them for real IDs from
    your AdMob console (see `WallpaperActions` and `RewardedAdManager`).
 
+4. **Firebase (optional, for in-app feedback)** — without it, the feedback
+   screen falls back to an email intent. To enable Firestore-backed
+   feedback:
+
+   1. **Create a project** at <https://console.firebase.google.com>.
+   2. **Register the Android app**: on the project overview page, click the
+      Android icon (or **+ Add app**). Enter `com.example.freshwall` as the
+      package name. Click **Register app**.
+   3. **Download `google-services.json`** from the next screen and drop it at
+      `app/app/google-services.json` (git-ignored).
+   4. **Enable Anonymous Auth**: left sidebar → **Authentication** →
+      **Sign-in method** tab → **Anonymous** → toggle on.
+   5. **Enable Firestore**: left sidebar → **Build** → **Firestore Database**
+      → **Create database**. Pick a region, choose **Production mode** — the
+      rules we ship lock things down correctly. Works on the free Spark tier.
+   6. **Enable Storage**: left sidebar → **Build** → **Storage** →
+      **Get started**. Storage requires the **Blaze (pay-as-you-go) plan** as
+      of 2024 — the console will prompt you to upgrade. The always-free tier
+      (5 GB stored / 1 GB egress per day) covers normal feedback-screenshot
+      usage, and Google offers a $300 starter credit. Pick a region (same as
+      Firestore is fine) and finish.
+   7. **Deploy the security rules** at the repo root:
+      ```bash
+      firebase deploy --only firestore:rules,storage
+      ```
+      (Install the CLI with `npm install -g firebase-tools` first if you
+      don't have it.)
+   8. **Register your debug SHA-1** (recommended) so Play Integrity attestation
+      passes during sign-in:
+      ```bash
+      cd app && ./gradlew :app:signingReport
+      ```
+      Copy the `SHA1:` value under **Variant: debug** and paste it into
+      **Project settings → Your apps → Add fingerprint**. Re-download
+      `google-services.json` after — fingerprints get baked in.
+
+   Submitted feedback lands in the `feedback` collection. Each doc has
+   `kind`, `body`, optional `screenshotUrl`, plus device + app metadata
+   (`appVersionName`, `androidSdk`, `device`, `anonId`, `createdAt`).
+
 ## Build & run
 
 From `app/`:

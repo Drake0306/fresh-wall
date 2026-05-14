@@ -165,16 +165,24 @@ fun HomeScreen(
     }
 
     // Trigger loadMore when the Pexels grid scrolls near the end.
+    //
+    // We pair the trigger condition with `total` so the snapshot value
+    // changes whenever a page of new items arrives. That way, if a previous
+    // loadMore call was deferred (e.g. raced with the initial load that
+    // hadn't finished yet), the flow re-emits as soon as the new items
+    // land and another loadMore fires. Without `total` in the snapshot,
+    // distinctUntilChanged would suppress the second emit and the user
+    // would be stranded at the end of the list with nothing loading.
     LaunchedEffect(pexelsGridState, selectedTab) {
         if (selectedTab != 1) return@LaunchedEffect
         snapshotFlow {
             val info = pexelsGridState.layoutInfo
             val total = info.totalItemsCount
             val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-            total > 0 && last >= total - 3
+            total to (total > 0 && last >= total - 3)
         }
             .distinctUntilChanged()
-            .filter { it }
+            .filter { (_, nearEnd) -> nearEnd }
             .collect { pexelsViewModel.loadMore() }
     }
 
@@ -243,7 +251,10 @@ fun HomeScreen(
                                             span = { GridItemSpan(maxLineSpan) },
                                             key = "loading_more",
                                         ) {
-                                            LoadingMoreIndicator(visible = pexelsState.isLoadingMore)
+                                            LoadingMoreIndicator(
+                                                isLoading = pexelsState.isLoadingMore,
+                                                onLoadMore = { pexelsViewModel.loadMore() },
+                                            )
                                         }
                                     }
                                 }

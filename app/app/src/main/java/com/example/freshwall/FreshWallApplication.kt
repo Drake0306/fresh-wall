@@ -11,6 +11,7 @@ import com.example.freshwall.data.AutoRotatePreferences
 import com.example.freshwall.data.FavoritesManager
 import com.example.freshwall.data.SearchHistoryManager
 import com.example.freshwall.data.ThemePreferences
+import com.example.freshwall.data.feedback.FeedbackRepository
 import com.example.freshwall.data.net.RetryInterceptor
 import com.example.freshwall.data.pexels.PexelsRepository
 import com.example.freshwall.work.AutoRotateScheduler
@@ -26,6 +27,7 @@ class FreshWallApplication : Application(), ImageLoaderFactory {
     val wallpaperActions: WallpaperActions by lazy { WallpaperActions(this) }
     val searchHistoryManager: SearchHistoryManager by lazy { SearchHistoryManager(this) }
     val pexelsRepository: PexelsRepository by lazy { PexelsRepository(httpClient = sharedHttpClient) }
+    val feedbackRepository: FeedbackRepository by lazy { FeedbackRepository(this) }
 
     // Single OkHttpClient shared by Coil + PexelsRepository so the retry
     // interceptor covers BOTH image loads and JSON API calls in one place.

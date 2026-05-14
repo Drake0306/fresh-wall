@@ -1,0 +1,28 @@
+// Firestore security rules for the FreshWall feedback collection.
+//
+// Anyone signed in (the app signs in anonymously) can CREATE a feedback
+// document, but nobody can read, update, or delete from the client — those
+// happen only from the Firebase console where the maintainer triages.
+//
+// Deploy with:
+//   firebase deploy --only firestore:rules
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /feedback/{id} {
+      allow create: if request.auth != null
+                    && request.resource.data.kind in ['bug', 'feedback']
+                    && request.resource.data.body is string
+                    && request.resource.data.body.size() > 0
+                    && request.resource.data.body.size() <= 5000;
+      allow read, update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

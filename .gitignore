@@ -16,6 +16,17 @@ build/
 local.properties
 **/local.properties
 
+# Firebase Android config — per-developer. Stays out of the public repo so
+# anyone forking can drop in their own project's google-services.json.
+google-services.json
+**/google-services.json
+
+# Firebase Admin SDK service-account keys (root access to the project — NEVER
+# commit). The Android app doesn't need these; they're only for server code.
+*-firebase-adminsdk-*.json
+**/service-account*.json
+**/serviceAccountKey*.json
+
 # Build outputs
 *.apk
 *.aab

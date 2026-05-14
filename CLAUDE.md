@@ -37,6 +37,19 @@ pexels.api.key=...
 It's exposed via `BuildConfig.PEXELS_API_KEY` (declared in
 `app/app/build.gradle.kts`). Without it the Pexels tab will fail to load.
 
+## Optional: Firebase (for in-app feedback)
+
+The feedback screen writes to Firestore (`feedback` collection) and Firebase
+Storage (`feedback-screenshots/{anonUid}/`) using Firebase anonymous auth.
+The `google-services` Gradle plugin is **conditionally applied** — see
+`app/app/build.gradle.kts`. If `app/app/google-services.json` is missing
+the plugin is skipped, Firebase auto-init doesn't happen, and
+`FeedbackRepository.isAvailable` returns `false`. The feedback screen then
+falls back to an email intent automatically.
+
+Security rules live at the repo root (`firestore.rules` / `storage.rules`),
+deployed via `firebase deploy`.
+
 ## Architecture in one paragraph
 
 - `FreshWallApplication` owns the singletons: `rewardedAdManager`,

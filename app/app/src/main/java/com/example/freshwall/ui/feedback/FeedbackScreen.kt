@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,10 +36,12 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,27 +50,54 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.freshwall.FreshWallApplication
+import com.example.freshwall.data.feedback.FeedbackKind
 import com.example.freshwall.ui.settings.SettingsTopBar
+import kotlinx.coroutines.launch
 
-// Placeholder — swap to your real support email.
+// Email fallback — used when Firebase isn't configured (e.g. a forked
+// checkout without google-services.json). Swap to your real address.
 private const val SUPPORT_EMAIL = "support@freshwall.app"
 
-private enum class FeedbackKind { BUG, FEEDBACK }
+private enum class SubmitState { IDLE, SENDING, SUCCESS }
 
 @Composable
 fun FeedbackScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val app = context.applicationContext as FreshWallApplication
+    val feedbackRepo = app.feedbackRepository
+    val scope = rememberCoroutineScope()
 
     var kind by remember { mutableStateOf(FeedbackKind.BUG) }
     var body by remember { mutableStateOf("") }
     var attachedImage by remember { mutableStateOf<Uri?>(null) }
+    var submitState by remember { mutableStateOf(SubmitState.IDLE) }
 
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
         attachedImage = uri
+    }
+
+    val sendViaEmail: () -> Unit = {
+        val subject = if (kind == FeedbackKind.BUG) "FreshWall · Bug report"
+                      else "FreshWall · Feedback"
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = if (attachedImage != null) "image/*" else "message/rfc822"
+            putExtra(Intent.EXTRA_EMAIL, arrayOf(SUPPORT_EMAIL))
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, body)
+            attachedImage?.let { putExtra(Intent.EXTRA_STREAM, it) }
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        runCatching {
+            context.startActivity(Intent.createChooser(intent, "Send feedback"))
+        }.onFailure {
+            Toast.makeText(context, "No email app available", Toast.LENGTH_SHORT).show()
+        }
+        Unit
     }
 
     Surface(
@@ -104,7 +134,11 @@ fun FeedbackScreen(
                 }
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    text = "Tell us what's on your mind",
+                    text = if (submitState == SubmitState.SUCCESS) {
+                        "Thanks — we'll take a look."
+                    } else {
+                        "Tell us what's on your mind"
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center,
@@ -125,12 +159,14 @@ fun FeedbackScreen(
                     selected = kind == FeedbackKind.BUG,
                     onClick = { kind = FeedbackKind.BUG },
                     label = { Text("Bug") },
+                    enabled = submitState != SubmitState.SENDING,
                     modifier = Modifier.weight(1f),
                 )
                 FilterChip(
                     selected = kind == FeedbackKind.FEEDBACK,
                     onClick = { kind = FeedbackKind.FEEDBACK },
                     label = { Text("Feedback") },
+                    enabled = submitState != SubmitState.SENDING,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -150,6 +186,7 @@ fun FeedbackScreen(
                     )
                 },
                 minLines = 6,
+                enabled = submitState != SubmitState.SENDING,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
@@ -167,6 +204,7 @@ fun FeedbackScreen(
                                 )
                             )
                         },
+                        enabled = submitState != SubmitState.SENDING,
                         modifier = Modifier
                             .padding(horizontal = 16.dp)
                             .fillMaxWidth(),
@@ -189,9 +227,19 @@ fun FeedbackScreen(
                                 .height(200.dp)
                                 .clip(RoundedCornerShape(16.dp)),
                         )
+                        if (!feedbackRepo.supportsScreenshots) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = "Screenshot uploads are temporarily disabled. " +
+                                    "Use the email button below to include this screenshot.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         Spacer(Modifier.height(8.dp))
                         OutlinedButton(
                             onClick = { attachedImage = null },
+                            enabled = submitState != SubmitState.SENDING,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text("Remove attachment")
@@ -212,34 +260,66 @@ fun FeedbackScreen(
                         ).show()
                         return@Button
                     }
-                    val subject = if (kind == FeedbackKind.BUG) {
-                        "FreshWall · Bug report"
-                    } else {
-                        "FreshWall · Feedback"
+                    if (!feedbackRepo.isAvailable) {
+                        // Firebase isn't configured in this build — fall back
+                        // to the email intent so the user still has a way to
+                        // reach us.
+                        sendViaEmail()
+                        return@Button
                     }
-                    val intent = Intent(Intent.ACTION_SEND).apply {
-                        type = if (attachedImage != null) "image/*" else "message/rfc822"
-                        putExtra(Intent.EXTRA_EMAIL, arrayOf(SUPPORT_EMAIL))
-                        putExtra(Intent.EXTRA_SUBJECT, subject)
-                        putExtra(Intent.EXTRA_TEXT, body)
-                        attachedImage?.let { putExtra(Intent.EXTRA_STREAM, it) }
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    runCatching {
-                        context.startActivity(Intent.createChooser(intent, "Send feedback"))
-                    }.onFailure {
-                        Toast.makeText(
-                            context,
-                            "No email app available",
-                            Toast.LENGTH_SHORT,
-                        ).show()
+                    submitState = SubmitState.SENDING
+                    scope.launch {
+                        val outcome = feedbackRepo.submit(kind, body, attachedImage)
+                        outcome
+                            .onSuccess {
+                                submitState = SubmitState.SUCCESS
+                                body = ""
+                                attachedImage = null
+                            }
+                            .onFailure { e ->
+                                submitState = SubmitState.IDLE
+                                // Show the step + underlying Firebase message
+                                // so the user (or a developer reading logcat)
+                                // can tell which stage failed.
+                                val msg = e.message ?: e.javaClass.simpleName
+                                Toast.makeText(
+                                    context,
+                                    "Couldn't send. $msg",
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            }
                     }
                 },
+                enabled = submitState != SubmitState.SENDING,
                 modifier = Modifier
                     .padding(horizontal = 16.dp)
                     .fillMaxWidth(),
             ) {
-                Text("Send")
+                when (submitState) {
+                    SubmitState.SENDING -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                        Spacer(Modifier.size(12.dp))
+                        Text("Sending…")
+                    }
+                    SubmitState.SUCCESS -> Text("Sent")
+                    SubmitState.IDLE -> Text("Send")
+                }
+            }
+
+            // Email fallback link — visible even when Firebase IS configured,
+            // so anyone who'd rather email us still can.
+            Spacer(Modifier.height(8.dp))
+            TextButton(
+                onClick = sendViaEmail,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth(),
+            ) {
+                Text("Or email us instead")
             }
 
             Spacer(

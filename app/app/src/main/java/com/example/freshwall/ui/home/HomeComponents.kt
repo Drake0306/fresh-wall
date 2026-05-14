@@ -404,7 +404,7 @@ fun WallpaperTile(
                 PexelsSourceBadge(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(6.dp),
+                        .padding(4.dp),
                 )
             }
             FavoriteOverlayIcon(
@@ -418,15 +418,21 @@ fun WallpaperTile(
     }
 }
 
+/**
+ * Source badge for Pexels-originated wallpapers. A small circular chip —
+ * the Box uses a fixed square `size()` so the `CircleShape` clip renders
+ * as a real circle (not a pill / oblong) regardless of the icon's natural
+ * width.
+ */
 @Composable
 private fun PexelsSourceBadge(
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
+            .size(26.dp)
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.45f))
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .background(Color.Black.copy(alpha = 0.45f)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(

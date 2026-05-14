@@ -140,17 +140,20 @@ fun SearchScreen(
         keyboard?.hide()
     }
 
-    // Trigger pagination when the results grid scrolls near the end.
+    // Trigger pagination when the results grid scrolls near the end. The
+    // `total` is part of the snapshot value so that a new page's arrival
+    // re-emits the flow — without it, distinctUntilChanged would swallow
+    // the re-trigger when the user is already at the bottom.
     LaunchedEffect(resultsGridState, submittedQuery, searchPexels) {
         if (!searchPexels || submittedQuery.isEmpty()) return@LaunchedEffect
         snapshotFlow {
             val info = resultsGridState.layoutInfo
             val total = info.totalItemsCount
             val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-            total > 0 && last >= total - 3
+            total to (total > 0 && last >= total - 3)
         }
             .distinctUntilChanged()
-            .filter { it }
+            .filter { (_, nearEnd) -> nearEnd }
             .collect { searchViewModel.loadMore() }
     }
 
@@ -313,6 +316,7 @@ fun SearchScreen(
                     error = if (searchPexels) pexelsState.error else null,
                     results = if (searchPexels) pexelsState.results else localResults,
                     onWallpaperClick = onWallpaperClick,
+                    onLoadMore = { searchViewModel.loadMore() },
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
                     favoriteIds = app.favoritesManager.favorites.collectAsStateWithLifecycle()
@@ -418,6 +422,7 @@ private fun SearchResults(
     favoriteIds: Set<String>,
     onFavoriteClick: (Wallpaper) -> Unit,
     onWallpaperClick: (Wallpaper) -> Unit,
+    onLoadMore: () -> Unit,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
@@ -474,7 +479,10 @@ private fun SearchResults(
                     span = { GridItemSpan(maxLineSpan) },
                     key = "loading_more",
                 ) {
-                    LoadingMoreIndicator(visible = isLoadingMore)
+                    LoadingMoreIndicator(
+                        isLoading = isLoadingMore,
+                        onLoadMore = onLoadMore,
+                    )
                 }
             }
         }

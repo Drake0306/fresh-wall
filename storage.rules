@@ -1,0 +1,27 @@
+// Storage security rules for FreshWall feedback screenshots.
+//
+// Each anonymous user can write image files (up to 5 MB) into their own
+// uid-scoped folder. Reads are blocked from the client; the maintainer
+// triages from the Firebase console (which bypasses these rules).
+//
+// Deploy with:
+//   firebase deploy --only storage
+
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /feedback-screenshots/{userId}/{fileName} {
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow read: if false;
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

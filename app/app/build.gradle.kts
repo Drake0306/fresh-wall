@@ -6,6 +6,15 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Apply the google-services plugin only if google-services.json is present.
+// The file is git-ignored (per-developer Firebase project), so CI and any
+// contributor building without their own Firebase project still get a clean
+// build. The in-app feedback feature degrades to the email fallback when
+// Firebase isn't initialised.
+if (file("google-services.json").exists()) {
+    apply(plugin = libs.plugins.google.services.get().pluginId)
+}
+
 val localProps = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
@@ -69,6 +78,18 @@ dependencies {
     implementation(libs.play.services.ads)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.core.splashscreen)
+
+    // Firebase — used by the in-app feedback flow. Firestore stores the
+    // text body + metadata, Storage holds the optional screenshot, and
+    // anonymous Auth lets the security rules require a signed-in user
+    // without forcing visible sign-in. Note: as of BoM 34.x the `-ktx`
+    // artifacts are gone (their Kotlin extensions merged into the main
+    // libraries), so we depend on the un-suffixed coordinates.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.storage)
+    implementation(libs.firebase.auth)
+    implementation(libs.kotlinx.coroutines.play.services)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
