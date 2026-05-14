@@ -98,3 +98,12 @@ It's exposed via `BuildConfig.PEXELS_API_KEY` (declared in
   code already throws if it does. Preserve that.
 - `runCatching` swallows `CancellationException` — use the
   `cancellationAwareCatch` helper in `PexelsRepository` instead.
+
+## Commit rules
+
+- **Never add a `Co-Authored-By: Claude` trailer** to commit messages on this
+  repo. The user has called this out as a bad habit — commits should look like
+  they were authored by Drake0306 alone. Same goes for any other AI-attribution
+  trailers.
+- Commit messages: short imperative title, blank line, then body explaining the
+  *why*. Don't mention Claude, AI, or the agent in the message.

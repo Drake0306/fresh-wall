@@ -1,0 +1,31 @@
+FreshWall
+Copyright 2026 Abhinav Roy
+
+This product includes software licensed under the Apache License,
+Version 2.0 (the "License"); you may not use this file except in
+compliance with the License. You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+================================================================================
+Third-party attributions
+================================================================================
+
+This application uses the following third-party software:
+
+- AndroidX, Jetpack Compose, Material 3, WorkManager — Google, Apache 2.0
+- Kotlin, kotlinx.serialization, kotlinx.coroutines — JetBrains, Apache 2.0
+- Coil — Apache 2.0 (https://github.com/coil-kt/coil)
+- OkHttp — Apache 2.0 (https://github.com/square/okhttp)
+- Google Mobile Ads (AdMob) SDK — Google, terms at
+  https://developers.google.com/admob/android/terms
+
+Photographs displayed in the Pexels tab are provided by Pexels
+(https://www.pexels.com) under the Pexels License. Photo attribution to
+the individual photographer is preserved in the in-app detail view.
+
+The Pexels brand mark used in this app to attribute Pexels-sourced
+photos is a trademark of Pexels GmbH and is used solely for attribution.
+
+Photographs displayed in the Featured tab are curated by the author from
+open-source collections and original works.

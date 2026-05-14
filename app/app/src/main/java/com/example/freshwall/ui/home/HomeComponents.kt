@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.freshwall.R
 import com.example.freshwall.data.Wallpaper
+import com.example.freshwall.data.WallpaperSource
 
 /**
  * Centered "FreshWall" title shown at the top of the home screen.
@@ -378,6 +379,7 @@ fun WallpaperTile(
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     modifier: Modifier = Modifier,
+    showSourceBadge: Boolean = false,
 ) {
     with(sharedTransitionScope) {
         Box(
@@ -398,6 +400,13 @@ fun WallpaperTile(
                         animatedVisibilityScope = animatedVisibilityScope,
                     ),
             )
+            if (showSourceBadge && wallpaper.source == WallpaperSource.PEXELS) {
+                PexelsSourceBadge(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp),
+                )
+            }
             FavoriteOverlayIcon(
                 isFavorite = isFavorite,
                 onClick = onFavoriteClick,
@@ -406,6 +415,26 @@ fun WallpaperTile(
                     .padding(4.dp),
             )
         }
+    }
+}
+
+@Composable
+private fun PexelsSourceBadge(
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.45f))
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = ImageVector.vectorResource(R.drawable.ic_pexels),
+            contentDescription = "From Pexels",
+            tint = Color.White,
+            modifier = Modifier.size(14.dp),
+        )
     }
 }
 

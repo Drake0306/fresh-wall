@@ -1,0 +1,47 @@
+# Compiles the debug build on every push to main and every pull request,
+# so contributors get fast feedback that their change at least builds.
+#
+# Doesn't need any real secrets — the Pexels key only matters at runtime,
+# so we write a placeholder into local.properties just to satisfy
+# BuildConfig generation.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Compile debug
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Write placeholder local.properties
+        working-directory: app
+        run: |
+          {
+            echo "sdk.dir=$ANDROID_HOME"
+            echo "pexels.api.key=placeholder_pexels_key_for_ci"
+          } > local.properties
+
+      - name: Compile debug
+        working-directory: app
+        run: ./gradlew :app:compileDebugKotlin :app:assembleDebug

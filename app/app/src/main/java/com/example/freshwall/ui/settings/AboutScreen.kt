@@ -48,6 +48,7 @@ private const val AUTHOR_TAGLINE = "Maker of FreshWall"
 private const val GITHUB_URL = "https://github.com/Drake0306"
 private const val LINKEDIN_URL = "https://www.linkedin.com/in/abhinav-roy-980020157/"
 private const val PEXELS_URL = "https://www.pexels.com"
+private const val REPO_URL = "https://github.com/Drake0306/fresh-wall"
 
 // GitHub serves a stable, public-facing avatar at /{username}.png — using that
 // here so we don't have to bundle a static profile photo or hit LinkedIn's
@@ -84,6 +85,7 @@ fun AboutScreen(
                     onLinkedInClick = { openUrl(LINKEDIN_URL) },
                 )
                 AppCard()
+                OpenSourceCard(onRepoClick = { openUrl(REPO_URL) })
                 PhotoSourcesCard(onPexelsClick = { openUrl(PEXELS_URL) })
                 Spacer(
                     Modifier.height(
@@ -227,6 +229,78 @@ private fun AppCard() {
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+        }
+    }
+}
+
+@Composable
+private fun OpenSourceCard(onRepoClick: () -> Unit) {
+    AboutCard {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Code,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(22.dp),
+                )
+                Text(
+                    text = "Open source",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "FreshWall is open source under the Apache 2.0 license. " +
+                    "Browse the code, file an issue, or send a pull request — " +
+                    "contributions are welcome.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
+            Surface(
+                onClick = onRepoClick,
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Code,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "github.com/Drake0306/fresh-wall",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Medium,
+                            ),
+                            maxLines = 1,
+                        )
+                        Text(
+                            text = "View source · file issues · open PRs",
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
         }
     }
 }

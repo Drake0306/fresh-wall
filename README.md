@@ -101,6 +101,36 @@ From `app/`:
 Android Studio: open `fresh-wall/app/` as the project root and use the Run
 button — minSdk is **26**, targetSdk is **36**.
 
+## Releases
+
+Releases follow the same pattern as Muzei and similar open-source Android
+apps: each Play Store version corresponds to a tagged GitHub Release with
+the signed APK attached.
+
+To cut a release:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The `Release` GitHub Actions workflow (`.github/workflows/release.yml`)
+picks up the tag, builds the release APK, and attaches it to a new GitHub
+Release with auto-generated changelog. The same APK is what gets uploaded
+to the Play Store.
+
+**Required repo secrets** (Settings → Secrets and variables → Actions):
+
+- `PEXELS_API_KEY` — read at build time, embedded as `BuildConfig.PEXELS_API_KEY`.
+
+**Optional (for a signed APK that Play Store accepts):**
+
+- `SIGNING_KEYSTORE_BASE64` — `base64 -w 0 release.keystore`
+- `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`, `SIGNING_STORE_PASSWORD`
+
+Without those four, the workflow still produces an unsigned release APK
+suitable for direct-install testing.
+
 ## Known limitations
 
 - Pexels' free API caps requests at **200/hour, 20k/month**. The repository
@@ -110,6 +140,13 @@ button — minSdk is **26**, targetSdk is **36**.
 - The donation URL, support email, and Firebase setup are placeholders. See
   `PLAN.md` for the publishing checklist.
 
+## Contributing
+
+PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the flow, code style,
+and the (short) list of things to avoid (mainly: don't bundle Pexels imagery,
+don't commit ad-unit IDs or signing keys).
+
 ## License
 
-Not currently licensed. All rights reserved.
+FreshWall is licensed under the [Apache License 2.0](LICENSE). Third-party
+attributions live in [NOTICE](NOTICE).

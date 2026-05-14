@@ -87,6 +87,7 @@ fun FavoritesScreen(
                             onFavoriteClick = { favoritesManager.toggle(w) },
                             sharedTransitionScope = sharedTransitionScope,
                             animatedVisibilityScope = animatedVisibilityScope,
+                            showSourceBadge = true,
                         )
                     }
                 }
