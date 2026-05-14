@@ -266,9 +266,26 @@ fun HomeScreen(
                             uiState.isLoading -> {
                                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                             }
+                            uiState.unconfigured -> {
+                                FeaturedEmptyState(
+                                    title = "Wallpaper feed coming soon",
+                                    body = "We're setting up the catalog. Browse the Pexels tab for now.",
+                                    modifier = Modifier.align(Alignment.Center),
+                                )
+                            }
                             uiState.error != null -> {
-                                Text(
-                                    text = "Error: ${uiState.error}",
+                                FeaturedEmptyState(
+                                    title = "Couldn't load wallpapers",
+                                    body = uiState.error.orEmpty(),
+                                    actionLabel = "Try again",
+                                    onAction = { viewModel.refresh() },
+                                    modifier = Modifier.align(Alignment.Center),
+                                )
+                            }
+                            featuredWallpapers.isEmpty() && uiState.heroes.isEmpty() -> {
+                                FeaturedEmptyState(
+                                    title = "Nothing in this category yet",
+                                    body = "Try another chip — or pull down to refresh.",
                                     modifier = Modifier.align(Alignment.Center),
                                 )
                             }

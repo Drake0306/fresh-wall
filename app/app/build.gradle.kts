@@ -20,6 +20,11 @@ val localProps = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 val pexelsApiKey: String = localProps.getProperty("pexels.api.key", "")
+// Public URL to the wallpapers manifest hosted on Cloudflare R2 (or any
+// static HTTPS endpoint). Empty until the bucket is configured — the
+// RemoteWallpaperRepository treats an empty value as "unconfigured" and
+// the Featured tab renders an empty state.
+val wallpaperManifestUrl: String = localProps.getProperty("wallpaper.manifest.url", "")
 
 android {
     namespace = "com.example.freshwall"
@@ -39,6 +44,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "PEXELS_API_KEY", "\"$pexelsApiKey\"")
+        buildConfigField("String", "WALLPAPER_MANIFEST_URL", "\"$wallpaperManifestUrl\"")
     }
 
     buildTypes {
