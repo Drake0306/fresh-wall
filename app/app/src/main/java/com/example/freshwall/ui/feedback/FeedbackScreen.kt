@@ -1,6 +1,5 @@
 package com.example.freshwall.ui.feedback
 
-import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -25,8 +24,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -36,7 +37,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,11 +55,7 @@ import com.example.freshwall.data.feedback.FeedbackKind
 import com.example.freshwall.ui.settings.SettingsTopBar
 import kotlinx.coroutines.launch
 
-// Email fallback — used when Firebase isn't configured (e.g. a forked
-// checkout without google-services.json). Swap to your real address.
-private const val SUPPORT_EMAIL = "support@freshwall.app"
-
-private enum class SubmitState { IDLE, SENDING, SUCCESS }
+private enum class SubmitState { IDLE, SENDING }
 
 @Composable
 fun FeedbackScreen(
@@ -74,30 +70,12 @@ fun FeedbackScreen(
     var body by remember { mutableStateOf("") }
     var attachedImage by remember { mutableStateOf<Uri?>(null) }
     var submitState by remember { mutableStateOf(SubmitState.IDLE) }
+    var showThankYouDialog by remember { mutableStateOf(false) }
 
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
         attachedImage = uri
-    }
-
-    val sendViaEmail: () -> Unit = {
-        val subject = if (kind == FeedbackKind.BUG) "FreshWall · Bug report"
-                      else "FreshWall · Feedback"
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = if (attachedImage != null) "image/*" else "message/rfc822"
-            putExtra(Intent.EXTRA_EMAIL, arrayOf(SUPPORT_EMAIL))
-            putExtra(Intent.EXTRA_SUBJECT, subject)
-            putExtra(Intent.EXTRA_TEXT, body)
-            attachedImage?.let { putExtra(Intent.EXTRA_STREAM, it) }
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        runCatching {
-            context.startActivity(Intent.createChooser(intent, "Send feedback"))
-        }.onFailure {
-            Toast.makeText(context, "No email app available", Toast.LENGTH_SHORT).show()
-        }
-        Unit
     }
 
     Surface(
@@ -134,11 +112,7 @@ fun FeedbackScreen(
                 }
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    text = if (submitState == SubmitState.SUCCESS) {
-                        "Thanks — we'll take a look."
-                    } else {
-                        "Tell us what's on your mind"
-                    },
+                    text = "Tell us what's on your mind",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center,
@@ -261,10 +235,11 @@ fun FeedbackScreen(
                         return@Button
                     }
                     if (!feedbackRepo.isAvailable) {
-                        // Firebase isn't configured in this build — fall back
-                        // to the email intent so the user still has a way to
-                        // reach us.
-                        sendViaEmail()
+                        Toast.makeText(
+                            context,
+                            "Feedback isn't available — Firebase isn't configured for this build.",
+                            Toast.LENGTH_LONG,
+                        ).show()
                         return@Button
                     }
                     submitState = SubmitState.SENDING
@@ -272,15 +247,13 @@ fun FeedbackScreen(
                         val outcome = feedbackRepo.submit(kind, body, attachedImage)
                         outcome
                             .onSuccess {
-                                submitState = SubmitState.SUCCESS
+                                submitState = SubmitState.IDLE
                                 body = ""
                                 attachedImage = null
+                                showThankYouDialog = true
                             }
                             .onFailure { e ->
                                 submitState = SubmitState.IDLE
-                                // Show the step + underlying Firebase message
-                                // so the user (or a developer reading logcat)
-                                // can tell which stage failed.
                                 val msg = e.message ?: e.javaClass.simpleName
                                 Toast.makeText(
                                     context,
@@ -305,21 +278,8 @@ fun FeedbackScreen(
                         Spacer(Modifier.size(12.dp))
                         Text("Sending…")
                     }
-                    SubmitState.SUCCESS -> Text("Sent")
                     SubmitState.IDLE -> Text("Send")
                 }
-            }
-
-            // Email fallback link — visible even when Firebase IS configured,
-            // so anyone who'd rather email us still can.
-            Spacer(Modifier.height(8.dp))
-            TextButton(
-                onClick = sendViaEmail,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .fillMaxWidth(),
-            ) {
-                Text("Or email us instead")
             }
 
             Spacer(
@@ -329,4 +289,58 @@ fun FeedbackScreen(
             )
         }
     }
+
+    if (showThankYouDialog) {
+        ThankYouDialog(
+            kind = kind,
+            onDismiss = { showThankYouDialog = false },
+        )
+    }
+}
+
+@Composable
+private fun ThankYouDialog(
+    kind: FeedbackKind,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(56.dp),
+            )
+        },
+        title = {
+            Text(
+                text = if (kind == FeedbackKind.BUG) "Thanks for the report!"
+                       else "Thanks for the feedback!",
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
+            )
+        },
+        text = {
+            Text(
+                text = if (kind == FeedbackKind.BUG) {
+                    "We read every bug report. If it's actionable, you'll likely " +
+                        "see a fix land in the next release. Thanks for taking the " +
+                        "time to write this up."
+                } else {
+                    "Every idea helps shape what FreshWall becomes. We read every " +
+                        "submission — even when we can't reply individually."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Done")
+            }
+        },
+        shape = RoundedCornerShape(28.dp),
+    )
 }
