@@ -1,0 +1,431 @@
+package com.example.freshwall.ui.home
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.example.freshwall.R
+import com.example.freshwall.data.Wallpaper
+
+/**
+ * Centered "FreshWall" title shown at the top of the home screen.
+ *
+ * [hideProgress] (0..1) fades + shrinks the pill so it dissolves before
+ * reaching the opaque status-bar backdrop. [raised] toggles the pill's
+ * surface treatment: at the very top of the feed we want the title to
+ * read as plain text on the background (no chip behind it); once content
+ * scrolls under it, the pill gains its surface + elevation so it stands
+ * out from the moving content. [showPexelsBadge] adds the Pexels mark
+ * next to the title — used to signal "this tab is showing Pexels photos"
+ * without crowding the bottom tab pills.
+ */
+@Composable
+fun HomeTitleBar(
+    onTitleClick: () -> Unit,
+    hideProgress: Float,
+    raised: Boolean,
+    showPexelsBadge: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val bg by animateColorAsState(
+        targetValue = if (raised) MaterialTheme.colorScheme.surfaceContainerHigh
+                      else Color.Transparent,
+        label = "titleBg",
+    )
+    val shadow by animateDpAsState(
+        targetValue = if (raised) 4.dp else 0.dp,
+        label = "titleShadow",
+    )
+    val tonal by animateDpAsState(
+        targetValue = if (raised) 3.dp else 0.dp,
+        label = "titleTonal",
+    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            onClick = onTitleClick,
+            shape = CircleShape,
+            color = bg,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            tonalElevation = tonal,
+            shadowElevation = shadow,
+            modifier = Modifier.graphicsLayer {
+                val p = hideProgress.coerceIn(0f, 1f)
+                alpha = 1f - p
+                val s = 1f - 0.08f * p
+                scaleX = s
+                scaleY = s
+            },
+        ) {
+            // Swap the title content with a sequential fade — the old
+            // version fades out completely first, then the layout snaps to
+            // the new size while the pill is invisible, then the new
+            // version fades in. The size change is hidden inside the
+            // invisible midpoint, so the user never sees "FreshWall" jump
+            // sideways when the Pexels badge appears or disappears.
+            AnimatedContent(
+                targetState = showPexelsBadge,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(durationMillis = 160, delayMillis = 160)) togetherWith
+                        fadeOut(animationSpec = tween(durationMillis = 160)) using
+                        SizeTransform(clip = false) { _, _ -> snap(delayMillis = 160) }
+                },
+                label = "titlePexelsBadge",
+            ) { hasBadge ->
+                Row(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "FreshWall",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    if (hasBadge) {
+                        Icon(
+                            imageVector = ImageVector.vectorResource(R.drawable.ic_pexels),
+                            contentDescription = "Showing Pexels photos",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Floating bottom navigation. Three separate pills, centered, not full-width.
+ * - Menu (left): standalone circular pill
+ * - Tabs (middle): pill with two segments; selected segment gets a filled
+ *   `secondaryContainer` background (Material 3 Expressive style)
+ * - Search (right): standalone circular pill
+ */
+@Composable
+fun BottomNavBar(
+    selectedIndex: Int,
+    onTabSelected: (Int) -> Unit,
+    onMenuClick: () -> Unit,
+    onSearchClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CircularNavPill(
+            icon = Icons.Outlined.Menu,
+            contentDescription = "Menu",
+            onClick = onMenuClick,
+        )
+        TabsPill(
+            selectedIndex = selectedIndex,
+            onTabSelected = onTabSelected,
+        )
+        CircularNavPill(
+            icon = Icons.Outlined.Search,
+            contentDescription = "Search",
+            onClick = onSearchClick,
+        )
+    }
+}
+
+@Composable
+private fun CircularNavPill(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 3.dp,
+        shadowElevation = 4.dp,
+        modifier = Modifier.size(48.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(imageVector = icon, contentDescription = contentDescription)
+        }
+    }
+}
+
+@Composable
+private fun TabsPill(
+    selectedIndex: Int,
+    onTabSelected: (Int) -> Unit,
+) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 3.dp,
+        shadowElevation = 4.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TabSegment(
+                label = "Featured",
+                selected = selectedIndex == 0,
+                onClick = { onTabSelected(0) },
+            )
+            TabSegment(
+                label = "Pexels",
+                selected = selectedIndex == 1,
+                onClick = { onTabSelected(1) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun TabSegment(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val bg by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.secondaryContainer
+                      else Color.Transparent,
+        label = "tabSegmentBg",
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+                      else MaterialTheme.colorScheme.onSurfaceVariant,
+        label = "tabSegmentText",
+    )
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(bg)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = textColor,
+        )
+    }
+}
+
+/**
+ * Filter categories shown above the Featured grid. Each maps to a deterministic
+ * slice of the bundled wallpaper list — no server roundtrip, no Pexels.
+ * "Daily" reshuffles once per day so the picks feel fresh without us having
+ * to ship new content.
+ */
+enum class WallpaperCategory(val label: String) {
+    ALL("All"),
+    DAILY("Daily"),
+    TRENDING("Trending"),
+    CURATED("Curated"),
+    CLASSICS("Classics"),
+}
+
+/**
+ * Apply [category] to the bundled [wallpapers]. Pure, deterministic — the
+ * same input on the same day yields the same output, so back-navigation
+ * doesn't reshuffle results under the user.
+ */
+fun filterByCategory(
+    wallpapers: List<Wallpaper>,
+    category: WallpaperCategory,
+): List<Wallpaper> {
+    if (wallpapers.isEmpty()) return wallpapers
+    return when (category) {
+        WallpaperCategory.ALL -> wallpapers
+        WallpaperCategory.DAILY -> {
+            val seed = java.time.LocalDate.now().toEpochDay()
+            wallpapers.shuffled(kotlin.random.Random(seed))
+                .take(6.coerceAtMost(wallpapers.size))
+        }
+        WallpaperCategory.TRENDING -> wallpapers.take(8.coerceAtMost(wallpapers.size))
+        WallpaperCategory.CURATED -> {
+            val mid = wallpapers.size / 2
+            wallpapers.drop(mid).take(8.coerceAtMost(wallpapers.size - mid))
+        }
+        WallpaperCategory.CLASSICS -> wallpapers.takeLast(8.coerceAtMost(wallpapers.size))
+    }
+}
+
+/**
+ * Horizontal row of selectable category pills. Mirrors the bottom-nav tabs:
+ * selected chip gets [ColorScheme.secondaryContainer]; the rest sit on
+ * [ColorScheme.surfaceContainerHigh] so they read as a row of buttons.
+ */
+@Composable
+fun CategoryChipsRow(
+    selected: WallpaperCategory,
+    onSelect: (WallpaperCategory) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        WallpaperCategory.entries.forEach { category ->
+            CategoryChip(
+                label = category.label,
+                selected = category == selected,
+                onClick = { onSelect(category) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun CategoryChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val bg by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.secondaryContainer
+                      else MaterialTheme.colorScheme.surfaceContainerHigh,
+        label = "categoryChipBg",
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+                      else MaterialTheme.colorScheme.onSurface,
+        label = "categoryChipText",
+    )
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = bg,
+        contentColor = textColor,
+        tonalElevation = if (selected) 0.dp else 2.dp,
+        shadowElevation = if (selected) 0.dp else 1.dp,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        )
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun WallpaperTile(
+    wallpaper: Wallpaper,
+    isFavorite: Boolean,
+    onClick: () -> Unit,
+    onFavoriteClick: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    modifier: Modifier = Modifier,
+) {
+    with(sharedTransitionScope) {
+        Box(
+            modifier = modifier
+                .aspectRatio(9f / 16f)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable(onClick = onClick),
+        ) {
+            AsyncImage(
+                model = wallpaper.thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .sharedElement(
+                        sharedContentState = rememberSharedContentState(key = "image-${wallpaper.id}"),
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    ),
+            )
+            FavoriteOverlayIcon(
+                isFavorite = isFavorite,
+                onClick = onFavoriteClick,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun FavoriteOverlayIcon(
+    isFavorite: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier,
+        colors = IconButtonDefaults.iconButtonColors(
+            containerColor = Color.Black.copy(alpha = 0.25f),
+            contentColor = if (isFavorite) Color.Red else Color.White,
+        ),
+    ) {
+        Icon(
+            imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+            contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+        )
+    }
+}

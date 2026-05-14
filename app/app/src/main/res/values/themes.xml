@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Runtime theme. Compose draws everything; we only need a DayNight-aware
+         window background so the activity-window flash before Compose's Surface
+         paints matches whatever theme we're heading into. -->
+    <style name="Theme.FreshWall" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+
+    <!-- Launcher theme. Shown by the framework until the first frame is drawn.
+         Then switches to postSplashScreenTheme (the runtime theme above). -->
+    <style name="Theme.FreshWall.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.FreshWall</item>
+    </style>
+
+</resources>

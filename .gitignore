@@ -1,0 +1,30 @@
+# Gradle
+.gradle/
+**/build/
+build/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.kotlin/
+
+# Native
+.externalNativeBuild/
+.cxx/
+
+# Local config — contains Android SDK path + Pexels API key (KEEP OUT).
+local.properties
+**/local.properties
+
+# Build outputs
+*.apk
+*.aab
+captures/
+**/captures/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

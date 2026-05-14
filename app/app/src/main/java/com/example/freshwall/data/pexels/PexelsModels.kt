@@ -1,0 +1,53 @@
+package com.example.freshwall.data.pexels
+
+import com.example.freshwall.data.Wallpaper
+import com.example.freshwall.data.WallpaperSource
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+internal data class PexelsSearchResponse(
+    val photos: List<PexelsPhoto> = emptyList(),
+    @SerialName("total_results") val totalResults: Int = 0,
+)
+
+@Serializable
+internal data class PexelsCuratedResponse(
+    val photos: List<PexelsPhoto> = emptyList(),
+)
+
+@Serializable
+internal data class PexelsPhoto(
+    val id: Long,
+    val url: String = "",
+    val photographer: String = "",
+    @SerialName("photographer_url") val photographerUrl: String = "",
+    val alt: String = "",
+    val src: PexelsSrc,
+) {
+    fun toWallpaper(): Wallpaper = Wallpaper(
+        id = "pexels:$id",
+        name = alt.takeIf { it.isNotBlank() } ?: "Pexels photo",
+        description = null,
+        // Consistent server-side portrait crop (800x1200) for grid tiles.
+        thumbnailUrl = src.portrait.ifEmpty { src.large },
+        // Full-resolution original — no resize, no crop. UI handles zoom-to-fit.
+        fullUrl = src.original.ifEmpty { src.large2x },
+        author = photographer.takeIf { it.isNotBlank() },
+        authorUrl = photographerUrl.takeIf { it.isNotBlank() },
+        sourceUrl = url.takeIf { it.isNotBlank() },
+        source = WallpaperSource.PEXELS,
+    )
+}
+
+@Serializable
+internal data class PexelsSrc(
+    val original: String = "",
+    val large2x: String = "",
+    val large: String = "",
+    val medium: String = "",
+    val small: String = "",
+    val portrait: String = "",
+    val landscape: String = "",
+    val tiny: String = "",
+)
