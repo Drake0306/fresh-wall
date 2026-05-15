@@ -8,13 +8,16 @@ import coil.memory.MemoryCache
 import com.example.freshwall.actions.WallpaperActions
 import com.example.freshwall.ads.RewardedAdManager
 import com.example.freshwall.data.AutoRotatePreferences
+import com.example.freshwall.data.CategoryPreferences
 import com.example.freshwall.data.FavoritesManager
 import com.example.freshwall.data.SearchHistoryManager
+import com.example.freshwall.data.SourcePreferences
 import com.example.freshwall.data.ThemePreferences
 import com.example.freshwall.data.feedback.FeedbackRepository
 import com.example.freshwall.data.manifest.RemoteWallpaperRepository
 import com.example.freshwall.data.net.RetryInterceptor
 import com.example.freshwall.data.pexels.PexelsRepository
+import com.example.freshwall.data.unsplash.UnsplashRepository
 import com.example.freshwall.work.AutoRotateScheduler
 import com.google.android.gms.ads.MobileAds
 import okhttp3.OkHttpClient
@@ -28,7 +31,10 @@ class FreshWallApplication : Application(), ImageLoaderFactory {
     val wallpaperActions: WallpaperActions by lazy { WallpaperActions(this) }
     val searchHistoryManager: SearchHistoryManager by lazy { SearchHistoryManager(this) }
     val pexelsRepository: PexelsRepository by lazy { PexelsRepository(httpClient = sharedHttpClient) }
+    val unsplashRepository: UnsplashRepository by lazy { UnsplashRepository(httpClient = sharedHttpClient) }
     val feedbackRepository: FeedbackRepository by lazy { FeedbackRepository(this) }
+    val sourcePreferences: SourcePreferences by lazy { SourcePreferences(this) }
+    val categoryPreferences: CategoryPreferences by lazy { CategoryPreferences(this) }
     val wallpaperRepository: RemoteWallpaperRepository by lazy {
         RemoteWallpaperRepository(this, sharedHttpClient)
     }
@@ -46,6 +52,8 @@ class FreshWallApplication : Application(), ImageLoaderFactory {
         // Touch persisted prefs early so the disk reads happen before first compose.
         themePreferences.themeMode
         autoRotatePreferences.config
+        sourcePreferences.config
+        categoryPreferences.config
         // Re-arm any auto-rotate schedule that was on before the app was killed/rebooted.
         AutoRotateScheduler.applyCurrent(this)
         MobileAds.initialize(this) {

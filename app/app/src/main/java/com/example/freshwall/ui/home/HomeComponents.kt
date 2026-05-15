@@ -67,16 +67,17 @@ import com.example.freshwall.data.WallpaperSource
  * surface treatment: at the very top of the feed we want the title to
  * read as plain text on the background (no chip behind it); once content
  * scrolls under it, the pill gains its surface + elevation so it stands
- * out from the moving content. [showPexelsBadge] adds the Pexels mark
- * next to the title — used to signal "this tab is showing Pexels photos"
- * without crowding the bottom tab pills.
+ * out from the moving content. [sourceBadge] adds the source's brand mark
+ * next to the title — Pexels mark when on the Pexels tab, Unsplash mark
+ * when on the Unsplash tab, nothing for Featured. Signals what the user
+ * is currently browsing without crowding the bottom tab pills.
  */
 @Composable
 fun HomeTitleBar(
     onTitleClick: () -> Unit,
     hideProgress: Float,
     raised: Boolean,
-    showPexelsBadge: Boolean,
+    sourceBadge: WallpaperSource?,
     modifier: Modifier = Modifier,
 ) {
     val bg by animateColorAsState(
@@ -119,16 +120,16 @@ fun HomeTitleBar(
             // the new size while the pill is invisible, then the new
             // version fades in. The size change is hidden inside the
             // invisible midpoint, so the user never sees "FreshWall" jump
-            // sideways when the Pexels badge appears or disappears.
+            // sideways when a source badge appears, disappears, or swaps.
             AnimatedContent(
-                targetState = showPexelsBadge,
+                targetState = sourceBadge,
                 transitionSpec = {
                     fadeIn(animationSpec = tween(durationMillis = 160, delayMillis = 160)) togetherWith
                         fadeOut(animationSpec = tween(durationMillis = 160)) using
                         SizeTransform(clip = false) { _, _ -> snap(delayMillis = 160) }
                 },
-                label = "titlePexelsBadge",
-            ) { hasBadge ->
+                label = "titleSourceBadge",
+            ) { source ->
                 Row(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -138,10 +139,15 @@ fun HomeTitleBar(
                         text = "FreshWall",
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    if (hasBadge) {
+                    val badgeRes = when (source) {
+                        WallpaperSource.PEXELS -> R.drawable.ic_pexels
+                        WallpaperSource.UNSPLASH -> R.drawable.ic_unsplash
+                        else -> null
+                    }
+                    if (badgeRes != null) {
                         Icon(
-                            imageVector = ImageVector.vectorResource(R.drawable.ic_pexels),
-                            contentDescription = "Showing Pexels photos",
+                            imageVector = ImageVector.vectorResource(badgeRes),
+                            contentDescription = "Showing ${source?.name?.lowercase()} photos",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(18.dp),
                         )
@@ -161,6 +167,7 @@ fun HomeTitleBar(
  */
 @Composable
 fun BottomNavBar(
+    tabLabels: List<String>,
     selectedIndex: Int,
     onTabSelected: (Int) -> Unit,
     onMenuClick: () -> Unit,
@@ -177,10 +184,16 @@ fun BottomNavBar(
             contentDescription = "Menu",
             onClick = onMenuClick,
         )
-        TabsPill(
-            selectedIndex = selectedIndex,
-            onTabSelected = onTabSelected,
-        )
+        // Only render the tabs pill when there's actually a choice to make.
+        // With a single enabled source, the user has nothing to switch
+        // between, so the pill would just be visual noise.
+        if (tabLabels.size > 1) {
+            TabsPill(
+                labels = tabLabels,
+                selectedIndex = selectedIndex,
+                onTabSelected = onTabSelected,
+            )
+        }
         CircularNavPill(
             icon = Icons.Outlined.Search,
             contentDescription = "Search",
@@ -212,6 +225,7 @@ private fun CircularNavPill(
 
 @Composable
 private fun TabsPill(
+    labels: List<String>,
     selectedIndex: Int,
     onTabSelected: (Int) -> Unit,
 ) {
@@ -227,16 +241,13 @@ private fun TabsPill(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TabSegment(
-                label = "Featured",
-                selected = selectedIndex == 0,
-                onClick = { onTabSelected(0) },
-            )
-            TabSegment(
-                label = "Pexels",
-                selected = selectedIndex == 1,
-                onClick = { onTabSelected(1) },
-            )
+            labels.forEachIndexed { i, label ->
+                TabSegment(
+                    label = label,
+                    selected = i == selectedIndex,
+                    onClick = { onTabSelected(i) },
+                )
+            }
         }
     }
 }
@@ -405,8 +416,17 @@ fun WallpaperTile(
                         animatedVisibilityScope = animatedVisibilityScope,
                     ),
             )
-            if (showSourceBadge && wallpaper.source == WallpaperSource.PEXELS) {
-                PexelsSourceBadge(
+            val badgeRes = if (showSourceBadge) {
+                when (wallpaper.source) {
+                    WallpaperSource.PEXELS -> R.drawable.ic_pexels
+                    WallpaperSource.UNSPLASH -> R.drawable.ic_unsplash
+                    WallpaperSource.FEATURED -> null
+                }
+            } else null
+            if (badgeRes != null) {
+                SourceBadge(
+                    iconRes = badgeRes,
+                    contentDescription = "From ${wallpaper.source.name.lowercase()}",
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(4.dp),
@@ -424,13 +444,15 @@ fun WallpaperTile(
 }
 
 /**
- * Source badge for Pexels-originated wallpapers. A small circular chip —
- * the Box uses a fixed square `size()` so the `CircleShape` clip renders
- * as a real circle (not a pill / oblong) regardless of the icon's natural
- * width.
+ * Source badge overlay for a wallpaper tile. Small circular chip with
+ * the source's brand mark inside. The Box uses a fixed square `size()`
+ * so the `CircleShape` clip renders as a real circle (not a pill /
+ * oblong) regardless of the glyph's natural width.
  */
 @Composable
-private fun PexelsSourceBadge(
+private fun SourceBadge(
+    @androidx.annotation.DrawableRes iconRes: Int,
+    contentDescription: String,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -441,8 +463,8 @@ private fun PexelsSourceBadge(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = ImageVector.vectorResource(R.drawable.ic_pexels),
-            contentDescription = "From Pexels",
+            imageVector = ImageVector.vectorResource(iconRes),
+            contentDescription = contentDescription,
             tint = Color.White,
             modifier = Modifier.size(14.dp),
         )

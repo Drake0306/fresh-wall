@@ -1,4 +1,4 @@
-package com.example.freshwall.ui.pexels
+package com.example.freshwall.ui.unsplash
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -7,7 +7,7 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.example.freshwall.FreshWallApplication
 import com.example.freshwall.data.Wallpaper
-import com.example.freshwall.data.pexels.PexelsRepository
+import com.example.freshwall.data.unsplash.UnsplashRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,54 +17,48 @@ import kotlinx.coroutines.sync.Mutex
 
 private const val PAGE_SIZE = 9
 
-data class PexelsHomeUiState(
+data class UnsplashHomeUiState(
     val wallpapers: List<Wallpaper> = emptyList(),
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
-    /** True while a pull-to-refresh is in flight. Distinct from [isLoading]
-     *  (initial load) so the M3 indicator can stay visible without blocking
-     *  the existing grid contents. */
     val isRefreshing: Boolean = false,
     val allLoaded: Boolean = false,
     val error: String? = null,
-    /** Which category from the user's selection is currently driving the feed.
-     *  `null` means "no selection — fell back to curated browse". */
+    /** Which category from the user's selection is currently driving the
+     *  feed. `null` means "no selection — fell back to popular browse". */
     val activeCategory: String? = null,
 )
 
 /**
- * Owns the "Pexels" home tab state. Lazy-loads `PAGE_SIZE` items on first tab
- * activation, then more pages on demand as the user scrolls near the end.
+ * Owns the "Unsplash" home tab state. Direct sibling of
+ * [com.example.freshwall.ui.pexels.PexelsHomeViewModel] — same lazy-load
+ * pattern, same Mutex de-dupe guard, same allLoaded / isLoadingMore /
+ * error contract. Anything that worked on the Pexels grid (auto-load
+ * snapshot flow, manual "Load more" button) works here unchanged.
  */
-class PexelsHomeViewModel(application: Application) : AndroidViewModel(application) {
+class UnsplashHomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val appContext: Application = application
-    private val repository: PexelsRepository =
-        (application as FreshWallApplication).pexelsRepository
+    private val repository: UnsplashRepository =
+        (application as FreshWallApplication).unsplashRepository
     private val categoryPreferences =
         (application as FreshWallApplication).categoryPreferences
 
-    private val _uiState = MutableStateFlow(PexelsHomeUiState())
-    val uiState: StateFlow<PexelsHomeUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(UnsplashHomeUiState())
+    val uiState: StateFlow<UnsplashHomeUiState> = _uiState.asStateFlow()
 
     private var currentPage = 0
     private var initialised = false
     private val loadMoreMutex = Mutex()
-    /** Category we're currently paging through (null = fell back to /curated). */
     private var activeCategory: String? = null
 
-    /** Picks one of the user's Pexels categories at random. Returns `null`
-     *  if the user has none selected — in that case the feed falls back to
-     *  Pexels' curated endpoint so the tab still shows something usable. */
-    private fun chooseCategory(): String? {
-        val pool = categoryPreferences.config.value.pexelsActive()
-        return pool.randomOrNull()
-    }
+    private fun chooseCategory(): String? =
+        categoryPreferences.config.value.unsplashActive().randomOrNull()
 
     private suspend fun fetchPage(page: Int): Result<List<Wallpaper>> {
         val category = activeCategory
         return if (category == null) {
-            repository.curated(page = page, perPage = PAGE_SIZE)
+            repository.popular(page = page, perPage = PAGE_SIZE)
         } else {
             repository.search(category, page = page, perPage = PAGE_SIZE)
         }
@@ -81,7 +75,7 @@ class PexelsHomeViewModel(application: Application) : AndroidViewModel(applicati
                 .onSuccess { list ->
                     currentPage = 1
                     _uiState.update {
-                        PexelsHomeUiState(
+                        UnsplashHomeUiState(
                             wallpapers = list,
                             isLoading = false,
                             allLoaded = list.size < PAGE_SIZE,
@@ -102,8 +96,7 @@ class PexelsHomeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    /** Pull-to-refresh entry point — picks a fresh random category from the
-     *  user's selection and re-fetches page 1. */
+    /** Pull-to-refresh entry point — picks a fresh random category and re-fetches. */
     fun refresh() {
         val state = _uiState.value
         if (state.isLoading || state.isRefreshing) return
@@ -115,7 +108,7 @@ class PexelsHomeViewModel(application: Application) : AndroidViewModel(applicati
             outcome
                 .onSuccess { list ->
                     currentPage = 1
-                    _uiState.value = PexelsHomeUiState(
+                    _uiState.value = UnsplashHomeUiState(
                         wallpapers = list,
                         isLoading = false,
                         isRefreshing = false,
@@ -137,8 +130,6 @@ class PexelsHomeViewModel(application: Application) : AndroidViewModel(applicati
         if (state.isLoading || state.isLoadingMore || state.allLoaded) return
         if (!initialised) return
         viewModelScope.launch {
-            // tryLock drops the call if another loadMore is already in flight,
-            // saving a redundant API request on top of the distinctBy safety.
             if (!loadMoreMutex.tryLock()) return@launch
             try {
                 _uiState.update { it.copy(isLoadingMore = true) }
@@ -170,8 +161,8 @@ class PexelsHomeViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     private fun errorMessage(e: Throwable): String =
-        if (!repository.isConfigured) "Add your Pexels API key to local.properties to load this tab."
-        else e.message ?: "Couldn't load Pexels."
+        if (!repository.isConfigured) "Add your Unsplash API key to local.properties to load this tab."
+        else e.message ?: "Couldn't load Unsplash."
 
     private fun prefetchThumbnails(list: List<Wallpaper>) {
         val loader = appContext.imageLoader

@@ -12,5 +12,9 @@ sealed interface Screen {
     data object AutoRotate : Screen
     data object Donate : Screen
     data object Feedback : Screen
+    /** First-launch onboarding flow. Drops into Home on completion. */
+    data object Onboarding : Screen
+    /** Settings → re-edit category preferences (no welcome / purpose steps). */
+    data object CategoryEditor : Screen
     data class Detail(val wallpaper: Wallpaper) : Screen
 }

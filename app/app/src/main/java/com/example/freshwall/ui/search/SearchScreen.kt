@@ -43,7 +43,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -73,6 +72,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.freshwall.FreshWallApplication
 import com.example.freshwall.data.Wallpaper
+import com.example.freshwall.data.WallpaperSource
 import com.example.freshwall.data.searchSuggestions
 import com.example.freshwall.ui.components.LoadingMoreIndicator
 import com.example.freshwall.ui.featured.FeaturedViewModel
@@ -114,8 +114,40 @@ fun SearchScreen(
 
     val searchViewModel: SearchViewModel = viewModel()
     val pexelsState by searchViewModel.pexelsState.collectAsStateWithLifecycle()
+    val unsplashState by searchViewModel.unsplashState.collectAsStateWithLifecycle()
     val submittedQuery by searchViewModel.submittedQuery.collectAsStateWithLifecycle()
-    val searchPexels by searchViewModel.searchPexels.collectAsStateWithLifecycle()
+    val searchSource by searchViewModel.searchSource.collectAsStateWithLifecycle()
+    val sourceConfig by app.sourcePreferences.config.collectAsStateWithLifecycle()
+
+    // If the user disables a source in settings while it's the active
+    // search source, snap back to a still-enabled one (prefer Pexels, then
+    // Unsplash, then Featured). The SourcePreferences invariant guarantees
+    // at least one of the three is enabled.
+    LaunchedEffect(sourceConfig) {
+        val active = searchSource
+        val stillAvailable = when (active) {
+            WallpaperSource.FEATURED -> sourceConfig.featured
+            WallpaperSource.PEXELS -> sourceConfig.pexels
+            WallpaperSource.UNSPLASH -> sourceConfig.unsplash
+        }
+        if (!stillAvailable) {
+            val fallback = when {
+                sourceConfig.pexels -> WallpaperSource.PEXELS
+                sourceConfig.unsplash -> WallpaperSource.UNSPLASH
+                else -> WallpaperSource.FEATURED
+            }
+            searchViewModel.setSearchSource(fallback)
+        }
+    }
+
+    // The currently-active remote state (Pexels or Unsplash). Featured
+    // search uses [localResults] instead and never hits this.
+    val remoteState = when (searchSource) {
+        WallpaperSource.PEXELS -> pexelsState
+        WallpaperSource.UNSPLASH -> unsplashState
+        else -> RemoteSearchState() // unused for Featured branch
+    }
+    val isRemoteSearch = searchSource != WallpaperSource.FEATURED
 
     var query by rememberSaveable(stateSaver = TextFieldValueSaver) {
         mutableStateOf(TextFieldValue(""))
@@ -144,8 +176,8 @@ fun SearchScreen(
     // `total` is part of the snapshot value so that a new page's arrival
     // re-emits the flow — without it, distinctUntilChanged would swallow
     // the re-trigger when the user is already at the bottom.
-    LaunchedEffect(resultsGridState, submittedQuery, searchPexels) {
-        if (!searchPexels || submittedQuery.isEmpty()) return@LaunchedEffect
+    LaunchedEffect(resultsGridState, submittedQuery, searchSource) {
+        if (!isRemoteSearch || submittedQuery.isEmpty()) return@LaunchedEffect
         snapshotFlow {
             val info = resultsGridState.layoutInfo
             val total = info.totalItemsCount
@@ -221,27 +253,49 @@ fun SearchScreen(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Search Pexels",
+                        text = "Search source",
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     Text(
-                        text = if (searchPexels) {
-                            "Searches the Pexels library"
-                        } else {
-                            "Searches your local collection"
+                        text = when (searchSource) {
+                            WallpaperSource.PEXELS -> "Searches the Pexels library"
+                            WallpaperSource.UNSPLASH -> "Searches the Unsplash library"
+                            WallpaperSource.FEATURED -> "Searches your FreshWall collection"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Switch(
-                    checked = searchPexels,
-                    onCheckedChange = { searchViewModel.setSearchPexels(it) },
-                )
             }
 
-            // Category chips + filter indicator — only when Pexels search is active.
-            AnimatedVisibility(visible = searchPexels) {
+            // Source picker — one chip per enabled source. Pexels comes
+            // first (the default), Unsplash next, Featured last if the
+            // user has it turned on in Settings.
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 4.dp),
+                contentPadding = PaddingValues(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val sources = buildList {
+                    if (sourceConfig.pexels) add(WallpaperSource.PEXELS to "Pexels")
+                    if (sourceConfig.unsplash) add(WallpaperSource.UNSPLASH to "Unsplash")
+                    if (sourceConfig.featured) add(WallpaperSource.FEATURED to "Featured")
+                }
+                items(sources, key = { it.first.name }) { (source, label) ->
+                    FilterChip(
+                        selected = searchSource == source,
+                        onClick = { searchViewModel.setSearchSource(source) },
+                        label = { Text(label) },
+                    )
+                }
+            }
+
+            // Category chips + filter indicator — only when a remote source
+            // is active (Featured search is just a local filter, so the
+            // category-quick-pick UI doesn't apply).
+            AnimatedVisibility(visible = isRemoteSearch) {
                 Column {
                     LazyRow(
                         modifier = Modifier
@@ -309,12 +363,12 @@ fun SearchScreen(
                     },
                 )
                 else -> SearchResults(
-                    isPexels = searchPexels,
-                    isLoading = searchPexels && pexelsState.isLoading,
-                    isLoadingMore = searchPexels && pexelsState.isLoadingMore,
-                    allLoaded = pexelsState.allLoaded,
-                    error = if (searchPexels) pexelsState.error else null,
-                    results = if (searchPexels) pexelsState.results else localResults,
+                    isRemote = isRemoteSearch,
+                    isLoading = isRemoteSearch && remoteState.isLoading,
+                    isLoadingMore = isRemoteSearch && remoteState.isLoadingMore,
+                    allLoaded = remoteState.allLoaded,
+                    error = if (isRemoteSearch) remoteState.error else null,
+                    results = if (isRemoteSearch) remoteState.results else localResults,
                     onWallpaperClick = onWallpaperClick,
                     onLoadMore = { searchViewModel.loadMore() },
                     sharedTransitionScope = sharedTransitionScope,
@@ -413,7 +467,7 @@ private fun SuggestionsList(
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun SearchResults(
-    isPexels: Boolean,
+    isRemote: Boolean,
     isLoading: Boolean,
     isLoadingMore: Boolean,
     allLoaded: Boolean,
@@ -451,7 +505,7 @@ private fun SearchResults(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = if (isPexels) "No Pexels results" else "Nothing in your library matches that",
+                text = if (isRemote) "No results" else "Nothing in your library matches that",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -472,9 +526,13 @@ private fun SearchResults(
                     onFavoriteClick = { onFavoriteClick(w) },
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
+                    // Search results mix sources — every tile shows its
+                    // origin badge so users can tell at a glance whether
+                    // a result is from Pexels or Unsplash.
+                    showSourceBadge = true,
                 )
             }
-            if (isPexels && !allLoaded) {
+            if (isRemote && !allLoaded) {
                 item(
                     span = { GridItemSpan(maxLineSpan) },
                     key = "loading_more",

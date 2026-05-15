@@ -40,6 +40,8 @@ import com.example.freshwall.ui.favorites.FavoritesScreen
 import com.example.freshwall.ui.featured.FeaturedViewModel
 import com.example.freshwall.ui.feedback.FeedbackScreen
 import com.example.freshwall.ui.home.HomeScreen
+import com.example.freshwall.ui.onboarding.CategoryEditorScreen
+import com.example.freshwall.ui.onboarding.OnboardingScreen
 import com.example.freshwall.ui.search.SearchScreen
 import com.example.freshwall.ui.settings.AboutScreen
 import com.example.freshwall.ui.settings.SettingsScreen
@@ -82,6 +84,8 @@ private fun Screen.routeKey(): String = when (this) {
     is Screen.AutoRotate -> "autorotate"
     is Screen.Donate -> "donate"
     is Screen.Feedback -> "feedback"
+    is Screen.Onboarding -> "onboarding"
+    is Screen.CategoryEditor -> "category-editor"
     is Screen.Detail -> "detail"
 }
 
@@ -89,7 +93,19 @@ private fun Screen.routeKey(): String = when (this) {
 @Composable
 private fun FreshWallApp() {
     val featuredViewModel: FeaturedViewModel = viewModel()
-    var screenStack: List<Screen> by remember { mutableStateOf(listOf(Screen.Home)) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val app = remember(context) { context.applicationContext as FreshWallApplication }
+
+    // First-launch routing: if the user hasn't been through onboarding yet,
+    // start them there instead of Home. The screen stack is replaced (not
+    // pushed) on onboarding completion so back-nav can't return them to
+    // the welcome flow.
+    val onboardingComplete = app.categoryPreferences.config.collectAsStateWithLifecycle().value
+        .onboardingComplete
+    val initialStack = remember(onboardingComplete) {
+        if (onboardingComplete) listOf(Screen.Home) else listOf(Screen.Onboarding)
+    }
+    var screenStack: List<Screen> by remember { mutableStateOf(initialStack) }
     val saveableStateHolder = rememberSaveableStateHolder()
     val currentScreen = screenStack.last()
 
@@ -98,7 +114,11 @@ private fun FreshWallApp() {
         if (screenStack.size > 1) screenStack = screenStack.dropLast(1)
     }
 
-    BackHandler(enabled = screenStack.size > 1) { goBack() }
+    // Block system back during onboarding so users can't accidentally
+    // bail mid-customization. Everywhere else, back pops the stack.
+    BackHandler(enabled = currentScreen !is Screen.Onboarding && screenStack.size > 1) {
+        goBack()
+    }
 
     SharedTransitionLayout {
         AnimatedContent(
@@ -165,6 +185,14 @@ private fun FreshWallApp() {
                         onBack = goBack,
                         onThemeClick = { navigate(Screen.Theme) },
                         onFeedbackClick = { navigate(Screen.Feedback) },
+                        onCategoriesClick = { navigate(Screen.CategoryEditor) },
+                    )
+                    is Screen.Onboarding -> OnboardingScreen(
+                        onFinished = { screenStack = listOf(Screen.Home) },
+                    )
+                    is Screen.CategoryEditor -> CategoryEditorScreen(
+                        onBack = goBack,
+                        onDone = goBack,
                     )
                     is Screen.About -> AboutScreen(onBack = goBack)
                     is Screen.Theme -> ThemeScreen(onBack = goBack)

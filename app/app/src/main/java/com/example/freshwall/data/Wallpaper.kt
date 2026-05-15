@@ -3,7 +3,7 @@ package com.example.freshwall.data
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class WallpaperSource { FEATURED, PEXELS }
+enum class WallpaperSource { FEATURED, PEXELS, UNSPLASH }
 
 @Serializable
 data class Wallpaper(
