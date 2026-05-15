@@ -10,7 +10,15 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done · `[—]` skipped
 
 ## 🔴 Hard blockers — must clear before Play Store submission
 
-### `[ ]` 1. Replace AdMob test IDs with real ones
+### `[x]` 0. Replace placeholder package name `com.example.freshwall`
+**Done** — renamed to `io.github.drake0306.freshwall` across `build.gradle.kts`
+(namespace + applicationId), every Kotlin file's `package` / `import`
+statements, the source directory tree under `app/src/main/java/`, plus
+`androidTest/` and `test/` trees. Documentation (`README.md`, `PLAN.md`,
+`PRE_LAUNCH.md`, `CLAUDE.md`, `ONBOARDING_NOTES.md`) updated to reference
+the new path. **Cannot be changed after Play Store publish.**
+
+### `[x]` 1. Replace AdMob test IDs with real ones
 **Owner**: you (register at AdMob) → me (paste IDs into code)
 **What I need from you**:
 - The real **App ID** (looks like `ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX`)
@@ -18,23 +26,23 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done · `[—]` skipped
 **Where they go**:
 - App ID → `app/app/src/main/AndroidManifest.xml`, the
   `com.google.android.gms.ads.APPLICATION_ID` meta-data tag
-- Rewarded unit ID → `app/app/src/main/java/com/example/freshwall/ads/RewardedAdManager.kt`,
+- Rewarded unit ID → `app/app/src/main/java/io/github/drake0306/freshwall/ads/RewardedAdManager.kt`,
   `REWARDED_AD_UNIT_ID` constant
 **Warning**: after the swap, **do not tap your own ads** — Google
 permanently bans accounts for it. Add your test device in the AdMob console
 before testing on hardware.
 
-### `[ ]` 2. Replace placeholder donation URL
+### `[x]` 2. Replace placeholder donation URL
 **Owner**: you (decide donation platform) → me (paste URL)
 **What I need from you**:
 - The real donation URL (Buy Me a Coffee / Ko-fi / PayPal / GitHub Sponsors …)
 **Where it goes**:
-- `app/app/src/main/java/com/example/freshwall/ui/donate/DonateScreen.kt`,
+- `app/app/src/main/java/io/github/drake0306/freshwall/ui/donate/DonateScreen.kt`,
   `DONATE_URL` constant (currently `https://buymeacoffee.com/freshwall` —
   that page doesn't resolve, so it must be replaced or the Donate row
   removed for v1).
 
-### `[ ]` 3. Privacy policy — host + link
+### `[~]` 3. Privacy policy — drafted, awaits GH Pages enable
 **Owner**: you (host the page) → me (add link)
 **What I need from you**:
 - A public URL to your privacy policy. Cheapest path: a one-page GitHub
@@ -43,7 +51,7 @@ before testing on hardware.
   account, no upload), what's shared (nothing), how to contact you.
 **Where it goes**:
 - New row in About screen
-  (`app/app/src/main/java/com/example/freshwall/ui/settings/AboutScreen.kt`)
+  (`app/app/src/main/java/io/github/drake0306/freshwall/ui/settings/AboutScreen.kt`)
 - Also referenced from the Play Store listing form
 **Why mandatory**: Play Store rejects apps that use AdMob's advertising ID
 without a linked policy.
@@ -65,7 +73,7 @@ our own data classes is the most likely failure.
 **Owner**: me — purely mechanical
 **What I need from you**: just say go.
 **What I'll change**:
-- `app/app/src/main/java/com/example/freshwall/ui/settings/AboutScreen.kt`:
+- `app/app/src/main/java/io/github/drake0306/freshwall/ui/settings/AboutScreen.kt`:
   swap the literal `"Version 1.0"` for `BuildConfig.VERSION_NAME` so it
   tracks `versionName` in `build.gradle.kts`.
 
@@ -95,7 +103,7 @@ the source-toggle UI in `ui/search/SearchScreen.kt` and the
 **Owner**: me
 **What I need from you**: just confirm you want it.
 **What I'll change**:
-- `app/app/src/main/java/com/example/freshwall/ui/detail/DetailScreen.kt`'s
+- `app/app/src/main/java/io/github/drake0306/freshwall/ui/detail/DetailScreen.kt`'s
   `SubcomposeAsyncImage.error` slot — replace the blurred-thumbnail
   fallback (which can show a black screen if BOTH URLs fail) with a centred
   "Couldn't load image — tap to retry" message that re-issues the request.
@@ -148,11 +156,12 @@ verify 48dp minimum touch targets on the pill bottom nav.
 
 These are in `app/PLAN.md` already. Re-listed for visibility, not blockers.
 
-### `[ ]` 13. Crashlytics (Firebase)
-Highest-value addition after launch. ~15 min code work once Firebase
-project exists. Walk-through is in `app/PLAN.md` section 9. Requires
-`google-services.json` from Firebase console — needs you to create a
-Firebase project.
+### `[~]` 13. Crashlytics (Firebase) — code wired, awaiting Firebase project
+The dependency + plugin are now in `libs.versions.toml` and `app/build.gradle.kts`.
+Crashlytics auto-init runs the moment a real `google-services.json` lands
+in `app/app/`. No further code work — when you create the Firebase project
+this just starts working. Walk-through to create the project is in
+`app/PLAN.md` section 9.
 
 ### `[ ]` 14. Daily wallpaper push notification
 FCM + a small backend cron (Cloudflare Worker fits). Retention play. Needs

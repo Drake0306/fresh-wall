@@ -19,10 +19,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FreshWall" >
 
-        <!-- Google's official AdMob TEST app ID. Replace with your real ID before publishing. -->
+        <!-- AdMob production app ID for FreshWall.
+             IMPORTANT: never tap your own ads from this device once it's
+             installed with this ID. AdMob will permanently ban the account.
+             Add your test device(s) at apps.admob.com → Settings → Test
+             devices first, then ads served to those devices come back as
+             test creatives even with the real ID in place. -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-5064546768446461~1659592839" />
 
         <activity
             android:name=".MainActivity"

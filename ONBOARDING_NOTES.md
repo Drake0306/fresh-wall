@@ -9,8 +9,8 @@ this one left off without re-reading the diff.
   and enhance search functionality* (author: Drake0306, 2026-05-15).
 - Branch: `main`, tracking `origin/main`.
 - **Uncommitted, staged** (not pushed):
-  - `app/app/src/main/java/com/example/freshwall/ui/onboarding/OnboardingComponents.kt`
-  - `app/app/src/main/java/com/example/freshwall/ui/onboarding/OnboardingScreen.kt`
+  - `app/app/src/main/java/io/github/drake0306/freshwall/ui/onboarding/OnboardingComponents.kt`
+  - `app/app/src/main/java/io/github/drake0306/freshwall/ui/onboarding/OnboardingScreen.kt`
 
 Nothing else is dirty. The onboarding scaffolding, Pexels/Unsplash data
 plumbing, settings entry, pull-to-refresh, and search-source refactor are
@@ -154,7 +154,7 @@ ModeSelect with the existing selections pre-loaded.
    only the two onboarding files are dirty (or note any new changes).
 2. Build + install: `cd app && ./gradlew :app:installDebug`.
 3. Wipe app data on the device so the onboarding routing kicks in
-   (`adb shell pm clear com.example.freshwall`).
+   (`adb shell pm clear io.github.drake0306.freshwall`).
 4. Walk the flow:
    - Welcome → tap Next
    - Purpose → tap "Yes, let's customize" (or "Skip for now")

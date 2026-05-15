@@ -13,11 +13,12 @@ coil = "2.7.0"
 kotlinxSerializationJson = "1.7.3"
 navigationCompose = "2.8.5"
 lifecycleCompose = "2.8.7"
-playServicesAds = "23.6.0"
+playServicesAds = "24.5.0"
 workRuntime = "2.9.1"
 coreSplashscreen = "1.0.1"
 
 firebaseBom = "34.13.0"
+firebaseCrashlyticsPlugin = "3.0.2"
 googleServices = "4.4.4"
 kotlinxCoroutinesPlayServices = "1.8.1"
 
@@ -51,6 +52,7 @@ firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.r
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-storage = { group = "com.google.firebase", name = "firebase-storage" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
+firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "kotlinxCoroutinesPlayServices" }
 
 [plugins]
@@ -58,3 +60,4 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }

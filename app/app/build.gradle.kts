@@ -6,13 +6,15 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Apply the google-services plugin only if google-services.json is present.
-// The file is git-ignored (per-developer Firebase project), so CI and any
-// contributor building without their own Firebase project still get a clean
-// build. The in-app feedback feature degrades to the email fallback when
-// Firebase isn't initialised.
+// Apply the google-services + crashlytics plugins only if google-services.json
+// is present. The file is git-ignored (per-developer Firebase project), so CI
+// and any contributor building without their own Firebase project still get
+// a clean build. The in-app feedback feature degrades to the email fallback
+// when Firebase isn't initialised, and Crashlytics auto-init silently no-ops
+// without google-services.json.
 if (file("google-services.json").exists()) {
     apply(plugin = libs.plugins.google.services.get().pluginId)
+    apply(plugin = libs.plugins.firebase.crashlytics.get().pluginId)
 }
 
 val localProps = Properties().apply {
@@ -28,7 +30,7 @@ val unsplashApiKey: String = localProps.getProperty("unsplash.api.key", "")
 val wallpaperManifestUrl: String = localProps.getProperty("wallpaper.manifest.url", "")
 
 android {
-    namespace = "com.example.freshwall"
+    namespace = "io.github.drake0306.freshwall"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -36,7 +38,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.freshwall"
+        applicationId = "io.github.drake0306.freshwall"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -51,7 +53,17 @@ android {
 
     buildTypes {
         release {
+            // isMinifyEnabled + isShrinkResources MUST flip together — the
+            // resource shrinker only runs if R8 is on. We keep both false
+            // until we can smoke-test a release APK on a real device.
+            // proguard-rules.pro is already populated with the @Serializable
+            // + WorkManager keep rules we need when R8 does get flipped on.
             isMinifyEnabled = false
+            isShrinkResources = false
+            // Explicit so a future build-type sweep can't accidentally
+            // ship a debuggable release. The default is false but the
+            // explicit declaration is the lint-friendly form.
+            isDebuggable = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -97,6 +109,9 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage)
     implementation(libs.firebase.auth)
+    // Crashlytics auto-initialises on first launch when google-services.json
+    // is present. No code wiring needed — the plugin instruments the build.
+    implementation(libs.firebase.crashlytics)
     implementation(libs.kotlinx.coroutines.play.services)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

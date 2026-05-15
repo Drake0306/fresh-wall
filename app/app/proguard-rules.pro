@@ -45,8 +45,8 @@
 # shapes for Pexels/Unsplash. Renaming any field there breaks deserialisation
 # of stuff users already have on their device.
 
--keep class com.example.freshwall.data.** { *; }
--keepclassmembers class com.example.freshwall.data.** { *; }
+-keep class io.github.drake0306.freshwall.data.** { *; }
+-keepclassmembers class io.github.drake0306.freshwall.data.** { *; }
 
 
 # ----------------------------- WorkManager workers ---------------------------

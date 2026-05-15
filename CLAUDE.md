@@ -88,16 +88,16 @@ deployed via `firebase deploy`.
 
 ## Files most often touched
 
-- `app/app/src/main/java/com/example/freshwall/ui/home/HomeScreen.kt` — screen
+- `app/app/src/main/java/io/github/drake0306/freshwall/ui/home/HomeScreen.kt` — screen
   layout, scroll-driven title state, category filter wiring.
-- `app/app/src/main/java/com/example/freshwall/ui/home/HomeComponents.kt` —
+- `app/app/src/main/java/io/github/drake0306/freshwall/ui/home/HomeComponents.kt` —
   shared bits: `HomeTitleBar`, `BottomNavBar`, `TabsPill`, `TabSegment`,
   `CategoryChipsRow`, `WallpaperTile`.
-- `app/app/src/main/java/com/example/freshwall/ui/detail/DetailScreen.kt` —
+- `app/app/src/main/java/io/github/drake0306/freshwall/ui/detail/DetailScreen.kt` —
   pinch-zoom, immersive mode, apply/download sheet.
-- `app/app/src/main/java/com/example/freshwall/data/FavoritesManager.kt` —
+- `app/app/src/main/java/io/github/drake0306/freshwall/data/FavoritesManager.kt` —
   JSON-persisted favorites of `Wallpaper`.
-- `app/app/src/main/java/com/example/freshwall/data/pexels/PexelsRepository.kt`
+- `app/app/src/main/java/io/github/drake0306/freshwall/data/pexels/PexelsRepository.kt`
   — paged search/curated calls + friendly HTTP error mapping.
 - `app/PLAN.md` — deferred backlog (Crashlytics setup, Pexels API limits,
   publish checklist).

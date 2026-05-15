@@ -15,15 +15,15 @@ before submitting to the Play Store.
   Currently `ca-app-pub-3940256099942544~3347511713` (Google's official test).
   Register the app at https://apps.admob.com.
 - **AdMob real rewarded ad unit ID** —
-  `app/src/main/java/com/example/freshwall/ads/RewardedAdManager.kt`,
+  `app/src/main/java/io/github/drake0306/freshwall/ads/RewardedAdManager.kt`,
   constant `REWARDED_AD_UNIT_ID`. Currently
   `ca-app-pub-3940256099942544/5224354917` (test). Same AdMob console.
 - **Donation URL** —
-  `app/src/main/java/com/example/freshwall/ui/donate/DonateScreen.kt`,
+  `app/src/main/java/io/github/drake0306/freshwall/ui/donate/DonateScreen.kt`,
   constant `DONATE_URL`. Currently `https://buymeacoffee.com/freshwall`.
   Replace with the real Buy Me a Coffee / Ko-fi / PayPal URL.
 - **Support email** —
-  `app/src/main/java/com/example/freshwall/ui/feedback/FeedbackScreen.kt`,
+  `app/src/main/java/io/github/drake0306/freshwall/ui/feedback/FeedbackScreen.kt`,
   constant `SUPPORT_EMAIL`. Currently `support@freshwall.app`. Replace with
   whatever address actually receives mail.
 
@@ -44,7 +44,7 @@ before submitting to the Play Store.
   `splash_background = #FFFFFFFF` (white); revisit if it clashes.
 - ~~**Verify app name**~~ — DONE. `app_name` already reads `FreshWall`.
 - **Real About page content** —
-  `app/src/main/java/com/example/freshwall/ui/settings/AboutScreen.kt`.
+  `app/src/main/java/io/github/drake0306/freshwall/ui/settings/AboutScreen.kt`.
   Currently shows "Version 1.0" + "Wallpapers, curated." Add real
   version (`BuildConfig.VERSION_NAME`), developer credit, license links.
 
@@ -76,7 +76,7 @@ before submitting to the Play Store.
   retry once. Mobile networks drop bytes occasionally; this fixes
   permanently-broken tiles until the user scrolls them off and back.
 - **Detail-screen error UI** —
-  `app/src/main/java/com/example/freshwall/ui/detail/DetailScreen.kt`,
+  `app/src/main/java/io/github/drake0306/freshwall/ui/detail/DetailScreen.kt`,
   `SubcomposeAsyncImage.error` slot. Currently falls back to the blurred
   thumbnail. If BOTH URLs fail (offline + cache miss) the screen is just
   black. Add a centered "Couldn't load image — tap to retry."
@@ -227,7 +227,7 @@ It's free, but it needs a Firebase project on your account — that part has to 
 1. Go to https://console.firebase.google.com.
 2. Click **Add project** → name it "FreshWall" → enable/disable Analytics as you prefer (Crashlytics doesn't require it; Analytics needs a Google Analytics account).
 3. Once the project is created, click **Add app → Android**.
-4. Use **`com.example.freshwall`** as the package name (or update both Firebase + `applicationId` in `build.gradle.kts` to your real one).
+4. Use **`io.github.drake0306.freshwall`** as the package name (or update both Firebase + `applicationId` in `build.gradle.kts` to your real one).
 5. Skip the SHA-1 for now (only needed for Google Sign-In etc.).
 6. Click **Download google-services.json**. **Move that file to `app/app/`** (next to the module's `build.gradle.kts` — same level as `src/`).
 

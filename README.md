@@ -40,7 +40,7 @@ fresh-wall/
     ├── gradlew, gradlew.bat
     └── app/                   :app module
         └── src/main/
-            ├── java/com/example/freshwall/
+            ├── java/io/github/drake0306/freshwall/
             │   ├── actions/            WallpaperActions, downloads
             │   ├── ads/                Rewarded-ad gating
             │   ├── data/               Models, FavoritesManager, repositories
@@ -85,7 +85,7 @@ fresh-wall/
 
    1. **Create a project** at <https://console.firebase.google.com>.
    2. **Register the Android app**: on the project overview page, click the
-      Android icon (or **+ Add app**). Enter `com.example.freshwall` as the
+      Android icon (or **+ Add app**). Enter `io.github.drake0306.freshwall` as the
       package name. Click **Register app**.
    3. **Download `google-services.json`** from the next screen and drop it at
       `app/app/google-services.json` (git-ignored).
