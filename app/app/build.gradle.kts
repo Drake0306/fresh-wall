@@ -29,6 +29,20 @@ val unsplashApiKey: String = localProps.getProperty("unsplash.api.key", "")
 // the Featured tab renders an empty state.
 val wallpaperManifestUrl: String = localProps.getProperty("wallpaper.manifest.url", "")
 
+// Release-signing creds. All gitignored — keystore file lives outside the
+// repo, passwords stay in local.properties. If any of these are missing
+// the release build still compiles, just unsigned (so it can't go to
+// Play Store but local QA still works).
+val releaseKeystorePath: String = localProps.getProperty("release.keystore.path", "")
+val releaseKeystorePassword: String = localProps.getProperty("release.keystore.password", "")
+val releaseKeyAlias: String = localProps.getProperty("release.key.alias", "")
+val releaseKeyPassword: String = localProps.getProperty("release.key.password", "")
+val hasReleaseSigning: Boolean = releaseKeystorePath.isNotBlank() &&
+    file(releaseKeystorePath).exists() &&
+    releaseKeystorePassword.isNotBlank() &&
+    releaseKeyAlias.isNotBlank() &&
+    releaseKeyPassword.isNotBlank()
+
 android {
     namespace = "io.github.drake0306.freshwall"
     compileSdk {
@@ -51,6 +65,20 @@ android {
         buildConfigField("String", "WALLPAPER_MANIFEST_URL", "\"$wallpaperManifestUrl\"")
     }
 
+    // Release signing — only registered when local.properties has all four
+    // creds and the keystore file actually exists. Lets CI / fresh clones
+    // build the release variant unsigned without exploding.
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             // isMinifyEnabled + isShrinkResources MUST flip together — the
@@ -68,6 +96,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Pick up the release signing config when it's configured.
+            // When unconfigured, leaving signingConfig null means the
+            // bundle/APK is unsigned and Play Store will refuse it —
+            // which is the right behaviour for a misconfigured machine.
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {

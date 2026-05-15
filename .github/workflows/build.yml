@@ -1,0 +1,60 @@
+name: Build
+
+# Run on every push to main and every pull request targeting main. Catches
+# compile errors and Gradle / dependency surprises before they land on a
+# release branch. Release builds (signed AAB → Play Store) happen locally
+# from a machine that has the keystore — CI deliberately doesn't have it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:  # let us re-run from the GitHub UI on demand
+
+# Allow only one concurrent run per ref. New pushes cancel an in-flight
+# build so we never have two CI jobs racing on the same code.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-debug:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        # AGP 9.x requires JDK 17 to run Gradle. The app's bytecode target
+        # is still JVM 11 (compileOptions in build.gradle.kts).
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        # Wraps gradle/gradle-build-action: handles the wrapper download,
+        # configures caching of ~/.gradle/caches and the wrapper distro,
+        # plus build-scan tooling if we ever enable it.
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Compile + assemble debug
+        # Working dir is `app/` because that's where settings.gradle.kts
+        # lives. Pexels / Unsplash API keys aren't set in CI — the build
+        # gracefully falls back to empty BuildConfig strings; runtime
+        # treats those as "unconfigured" and shows empty states instead
+        # of crashing.
+        working-directory: app
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload debug APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: freshwall-debug-apk
+          path: app/app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+          if-no-files-found: error

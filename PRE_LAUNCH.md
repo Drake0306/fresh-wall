@@ -56,7 +56,22 @@ before testing on hardware.
 **Why mandatory**: Play Store rejects apps that use AdMob's advertising ID
 without a linked policy.
 
-### `[ ]` 4. Turn on R8 minification + test release build
+### `[~]` 4. Turn on R8 minification + test release build
+**Alpha v1 cut**: `builds/freshwall-alpha-1.0-debug.apk` (29 MB, signed
+debug keystore, installable on any phone) and `freshwall-alpha-1.0-release-UNSIGNED.apk`
+(21 MB, release variant minus signing). Release pipeline confirmed working
+end-to-end; only thing blocking Play Console upload is the release keystore
+(see ALPHA_RELEASE.md Part A). R8 still off pending smoke-test on real device.
+
+**Old subsection (kept for reference):**
+Signing config is now wired (reads `release.*` keys from `local.properties`).
+CI workflow at `.github/workflows/build.yml` validates every push.
+ALPHA_RELEASE.md has the full playbook for keystore generation, signed AAB
+build, and Play Console internal-test upload. Once you've smoke-tested an
+unsigned-R8-off alpha on your phone, we can flip `isMinifyEnabled = true`
+and run the same flow to verify R8 doesn't break anything.
+
+**Old subsection (kept for reference):**
 **Owner**: me (edit gradle, add keep rules) → you (install release APK, walk
 through every screen on a real device)
 **What I need from you**:
