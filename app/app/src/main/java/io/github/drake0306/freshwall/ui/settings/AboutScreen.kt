@@ -2,6 +2,7 @@ package io.github.drake0306.freshwall.ui.settings
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,9 +36,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.vectorResource
 import io.github.drake0306.freshwall.BuildConfig
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +53,7 @@ private const val AUTHOR_TAGLINE = "Maker of FreshWall"
 private const val GITHUB_URL = "https://github.com/Drake0306"
 private const val LINKEDIN_URL = "https://www.linkedin.com/in/abhinav-roy-980020157/"
 private const val PEXELS_URL = "https://www.pexels.com"
+private const val UNSPLASH_URL = "https://unsplash.com"
 private const val REPO_URL = "https://github.com/Drake0306/fresh-wall"
 // Privacy policy — served from this repo's docs/ folder via GitHub Pages
 // once the user enables Pages on the repo (Settings → Pages → Deploy from
@@ -92,7 +96,10 @@ fun AboutScreen(
                 )
                 AppCard()
                 OpenSourceCard(onRepoClick = { openUrl(REPO_URL) })
-                PhotoSourcesCard(onPexelsClick = { openUrl(PEXELS_URL) })
+                PhotoSourcesCard(
+                    onPexelsClick = { openUrl(PEXELS_URL) },
+                    onUnsplashClick = { openUrl(UNSPLASH_URL) },
+                )
                 PrivacyCard(onPolicyClick = { openUrl(PRIVACY_URL) })
                 Spacer(
                     Modifier.height(
@@ -219,6 +226,23 @@ private fun AppCard() {
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // App logo. Same artwork as the launcher icon / splash / welcome
+            // step — wrapping in a transparent Surface gives us a soft drop
+            // shadow under the bitmap's natural rounded-square shape.
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = Color.Transparent,
+                shadowElevation = 8.dp,
+                modifier = Modifier.size(96.dp),
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.app_logo),
+                    contentDescription = "FreshWall logo",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            Spacer(Modifier.height(16.dp))
             Text(
                 text = "FreshWall",
                 style = MaterialTheme.typography.headlineMedium,
@@ -385,7 +409,10 @@ private fun PrivacyCard(onPolicyClick: () -> Unit) {
 }
 
 @Composable
-private fun PhotoSourcesCard(onPexelsClick: () -> Unit) {
+private fun PhotoSourcesCard(
+    onPexelsClick: () -> Unit,
+    onUnsplashClick: () -> Unit,
+) {
     AboutCard {
         Column(modifier = Modifier.padding(24.dp)) {
             Text(
@@ -396,10 +423,11 @@ private fun PhotoSourcesCard(onPexelsClick: () -> Unit) {
             Spacer(Modifier.height(16.dp))
 
             SourceRow(
-                title = "Featured tab",
-                body = "Hand-picked by us — a mix of open-source artwork and originals " +
-                    "we've created. These are bundled with the app and don't need a network " +
-                    "connection.",
+                title = "Featured tab · in development",
+                body = "A hand-picked mix of open-source artwork and originals. Still " +
+                    "being built — the catalog is being filled out before this tab " +
+                    "earns its keep in a future release. You can hide it from Settings " +
+                    "while it's experimental.",
             )
             Spacer(Modifier.height(16.dp))
 
@@ -440,6 +468,51 @@ private fun PhotoSourcesCard(onPexelsClick: () -> Unit) {
                         text = "Photos in the Pexels tab are provided by Pexels — " +
                             "a free stock photography library. Each photo links back " +
                             "to its photographer on pexels.com. Tap to learn more.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // Unsplash gets the same treatment — their API guidelines
+            // require attribution on every screen showing Unsplash imagery,
+            // and a link back to unsplash.com / photographer profiles.
+            Surface(
+                onClick = onUnsplashClick,
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = ImageVector.vectorResource(R.drawable.ic_unsplash),
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = "Unsplash tab",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Photos in the Unsplash tab are provided by Unsplash. " +
+                            "Each photo links back to its photographer's profile, with " +
+                            "their bio and social links. Tap to learn more.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
