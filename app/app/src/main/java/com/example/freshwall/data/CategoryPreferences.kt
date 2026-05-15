@@ -54,6 +54,9 @@ enum class CustomizationMode {
  * Selection rules enforced in the UI:
  *   - At least 5 categories per active set.
  *   - At most 15 categories per active set.
+ *   - At most [MAX_STARRED] starred categories per active set. Starred
+ *     categories are higher-priority and surface more often in the feed
+ *     rotation; non-starred selections still show up, just less frequently.
  */
 @Serializable
 data class CategoryConfig(
@@ -62,6 +65,9 @@ data class CategoryConfig(
     val combinedCategories: List<String> = emptyList(),
     val pexelsCategories: List<String> = emptyList(),
     val unsplashCategories: List<String> = emptyList(),
+    val combinedStarred: List<String> = emptyList(),
+    val pexelsStarred: List<String> = emptyList(),
+    val unsplashStarred: List<String> = emptyList(),
 ) {
     /** Categories that drive the Pexels feed, respecting [mode]. */
     fun pexelsActive(): List<String> = when (mode) {
@@ -73,6 +79,24 @@ data class CategoryConfig(
     fun unsplashActive(): List<String> = when (mode) {
         CustomizationMode.COMBINED -> combinedCategories
         CustomizationMode.SEPARATE -> unsplashCategories
+    }
+
+    /** Starred Pexels categories, filtered to the currently-selected pool. */
+    fun pexelsStarredActive(): Set<String> {
+        val pool = pexelsActive().toSet()
+        val source = if (mode == CustomizationMode.COMBINED) combinedStarred else pexelsStarred
+        return source.filter { it in pool }.toSet()
+    }
+
+    /** Starred Unsplash categories, filtered to the currently-selected pool. */
+    fun unsplashStarredActive(): Set<String> {
+        val pool = unsplashActive().toSet()
+        val source = if (mode == CustomizationMode.COMBINED) combinedStarred else unsplashStarred
+        return source.filter { it in pool }.toSet()
+    }
+
+    companion object {
+        const val MAX_STARRED = 3
     }
 }
 
@@ -97,6 +121,9 @@ class CategoryPreferences(context: Context) {
         combined: List<String>,
         pexels: List<String>,
         unsplash: List<String>,
+        combinedStarred: List<String> = emptyList(),
+        pexelsStarred: List<String> = emptyList(),
+        unsplashStarred: List<String> = emptyList(),
     ) = update {
         it.copy(
             onboardingComplete = true,
@@ -104,6 +131,9 @@ class CategoryPreferences(context: Context) {
             combinedCategories = combined,
             pexelsCategories = pexels,
             unsplashCategories = unsplash,
+            combinedStarred = combinedStarred,
+            pexelsStarred = pexelsStarred,
+            unsplashStarred = unsplashStarred,
         )
     }
 

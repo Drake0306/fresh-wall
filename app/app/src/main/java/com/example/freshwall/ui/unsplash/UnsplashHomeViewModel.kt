@@ -26,17 +26,14 @@ data class UnsplashHomeUiState(
     val isRefreshing: Boolean = false,
     val allLoaded: Boolean = false,
     val error: String? = null,
-    /** Which category from the user's selection is currently driving the
-     *  feed. `null` means "no selection — fell back to popular browse". */
-    val activeCategory: String? = null,
 )
 
 /**
  * Owns the "Unsplash" home tab state. Direct sibling of
- * [com.example.freshwall.ui.pexels.PexelsHomeViewModel] — same lazy-load
- * pattern, same Mutex de-dupe guard, same allLoaded / isLoadingMore /
- * error contract. Anything that worked on the Pexels grid (auto-load
- * snapshot flow, manual "Load more" button) works here unchanged.
+ * [com.example.freshwall.ui.pexels.PexelsHomeViewModel] — same round-robin
+ * rotation over the user's selected categories, same Mutex de-dupe, same
+ * allLoaded / isLoadingMore / error contract. Falls back to Unsplash's
+ * `popular` browse when the user has no Unsplash categories selected.
  */
 class UnsplashHomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -49,39 +46,85 @@ class UnsplashHomeViewModel(application: Application) : AndroidViewModel(applica
     private val _uiState = MutableStateFlow(UnsplashHomeUiState())
     val uiState: StateFlow<UnsplashHomeUiState> = _uiState.asStateFlow()
 
-    private var currentPage = 0
     private var initialised = false
     private val loadMoreMutex = Mutex()
-    private var activeCategory: String? = null
 
-    private fun chooseCategory(): String? =
-        categoryPreferences.config.value.unsplashActive().randomOrNull()
+    private var categoryRotation: List<String> = emptyList()
+    private var rotationIndex: Int = 0
+    private val categoryPages: MutableMap<String, Int> = mutableMapOf()
+    private val exhaustedCategories: MutableSet<String> = mutableSetOf()
+    private var popularPage: Int = 0
 
-    private suspend fun fetchPage(page: Int, forceFresh: Boolean = false): Result<List<Wallpaper>> {
-        val category = activeCategory
-        return if (category == null) {
-            repository.popular(page = page, perPage = PAGE_SIZE, forceFresh = forceFresh)
-        } else {
-            repository.search(category, page = page, perPage = PAGE_SIZE, forceFresh = forceFresh)
-        }
+    private fun resetRotation() {
+        val config = categoryPreferences.config.value
+        val active = config.unsplashActive()
+        val starred = config.unsplashStarredActive()
+        // Weighted rotation: starred categories appear STARRED_WEIGHT times.
+        // See PexelsHomeViewModel.STARRED_WEIGHT for the reasoning.
+        categoryRotation = active.flatMap { category ->
+            val weight = if (category in starred) STARRED_WEIGHT else 1
+            List(weight) { category }
+        }.shuffled()
+        rotationIndex = 0
+        categoryPages.clear()
+        exhaustedCategories.clear()
+        popularPage = 0
     }
+
+    private companion object {
+        const val STARRED_WEIGHT = 3
+    }
+
+    private suspend fun fetchNext(forceFresh: Boolean = false): Result<List<Wallpaper>> {
+        if (categoryRotation.isEmpty()) {
+            val page = popularPage + 1
+            return repository.popular(
+                page = page, perPage = PAGE_SIZE, forceFresh = forceFresh,
+            ).also { result ->
+                result.onSuccess { list -> if (list.isNotEmpty()) popularPage = page }
+            }
+        }
+
+        val pool = categoryRotation
+        val total = pool.size
+        for (offset in 0 until total) {
+            val idx = (rotationIndex + offset) % total
+            val candidate = pool[idx]
+            if (candidate in exhaustedCategories) continue
+
+            rotationIndex = (idx + 1) % total
+            val nextPage = (categoryPages[candidate] ?: 0) + 1
+            val outcome = repository.search(
+                query = candidate,
+                page = nextPage,
+                perPage = PAGE_SIZE,
+                forceFresh = forceFresh,
+            )
+            outcome.onSuccess { list ->
+                if (list.isNotEmpty()) categoryPages[candidate] = nextPage
+                if (list.size < PAGE_SIZE) exhaustedCategories.add(candidate)
+            }
+            return outcome
+        }
+        return Result.success(emptyList())
+    }
+
+    private fun isAllExhausted(): Boolean =
+        categoryRotation.isNotEmpty() && categoryRotation.all { it in exhaustedCategories }
 
     fun loadIfNeeded() {
         if (initialised || _uiState.value.isLoading) return
         initialised = true
-        activeCategory = chooseCategory()
+        resetRotation()
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val outcome = fetchPage(page = 1)
-            outcome
+            fetchNext(forceFresh = false)
                 .onSuccess { list ->
-                    currentPage = 1
                     _uiState.update {
                         UnsplashHomeUiState(
                             wallpapers = list,
                             isLoading = false,
-                            allLoaded = list.size < PAGE_SIZE,
-                            activeCategory = activeCategory,
+                            allLoaded = list.isEmpty() || isAllExhausted(),
                         )
                     }
                     prefetchThumbnails(list)
@@ -89,33 +132,25 @@ class UnsplashHomeViewModel(application: Application) : AndroidViewModel(applica
                 .onFailure { e ->
                     initialised = false
                     _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = errorMessage(e),
-                        )
+                        it.copy(isLoading = false, error = errorMessage(e))
                     }
                 }
         }
     }
 
-    /** Pull-to-refresh entry point — picks a fresh random category and re-fetches. */
     fun refresh() {
         val state = _uiState.value
         if (state.isLoading || state.isRefreshing) return
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true, error = null) }
-            activeCategory = chooseCategory()
-            currentPage = 0
-            val outcome = fetchPage(page = 1, forceFresh = true)
-            outcome
+            resetRotation()
+            fetchNext(forceFresh = true)
                 .onSuccess { list ->
-                    currentPage = 1
                     _uiState.value = UnsplashHomeUiState(
                         wallpapers = list,
                         isLoading = false,
                         isRefreshing = false,
-                        allLoaded = list.size < PAGE_SIZE,
-                        activeCategory = activeCategory,
+                        allLoaded = list.isEmpty() || isAllExhausted(),
                     )
                     prefetchThumbnails(list)
                 }
@@ -135,19 +170,16 @@ class UnsplashHomeViewModel(application: Application) : AndroidViewModel(applica
             if (!loadMoreMutex.tryLock()) return@launch
             try {
                 _uiState.update { it.copy(isLoadingMore = true) }
-                val nextPage = currentPage + 1
-                val outcome = fetchPage(page = nextPage)
-                outcome
+                fetchNext(forceFresh = false)
                     .onSuccess { list ->
                         if (list.isEmpty()) {
                             _uiState.update { it.copy(isLoadingMore = false, allLoaded = true) }
                         } else {
-                            currentPage = nextPage
                             _uiState.update {
                                 it.copy(
                                     wallpapers = (it.wallpapers + list).distinctBy { w -> w.id },
                                     isLoadingMore = false,
-                                    allLoaded = list.size < PAGE_SIZE,
+                                    allLoaded = isAllExhausted(),
                                 )
                             }
                             prefetchThumbnails(list)

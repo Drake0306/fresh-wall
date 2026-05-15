@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.freshwall.R
+import com.example.freshwall.data.CategoryConfig
 import com.example.freshwall.data.WALLPAPER_CATEGORIES
 
 /** Source brand colors used on the picker headers. */
@@ -361,10 +363,27 @@ internal fun CategoryPickerStep(
     subtitle: String,
     headerAccent: TopHeaderAccent,
     initialSelection: Set<String>,
-    onNext: (Set<String>) -> Unit,
+    initialStarred: Set<String> = emptySet(),
+    onNext: (selection: Set<String>, starred: Set<String>) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    var selected by remember(initialSelection) { mutableStateOf(initialSelection) }
+    // Selection tracked as an ordered list. The first MAX_STARRED entries
+    // are automatically the user's "top picks" (rendered with a star icon
+    // and weighted more heavily by the home rotation). Re-prioritising
+    // means deselecting an early pick so a later one moves into the slot.
+    var orderedSelection by remember(initialSelection, initialStarred) {
+        // Seed with starred-first ordering: stars at the front (capped at
+        // MAX_STARRED), then everything else from the initial selection.
+        // Filters to the current selection so a stale persisted blob can't
+        // resurrect deselected categories.
+        val starredFirst = initialStarred
+            .filter { it in initialSelection }
+            .take(CategoryConfig.MAX_STARRED)
+        val rest = initialSelection.filter { it !in starredFirst }
+        mutableStateOf(starredFirst + rest)
+    }
+    val selected = orderedSelection.toSet()
+    val starred = orderedSelection.take(CategoryConfig.MAX_STARRED).toSet()
 
     val visible = remember(query) {
         if (query.isBlank()) WALLPAPER_CATEGORIES
@@ -423,7 +442,20 @@ internal fun CategoryPickerStep(
                 .padding(horizontal = 20.dp),
         )
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
+
+        // Discoverable hint — explain that selection order matters so
+        // users know which 3 chips became their top picks.
+        Text(
+            text = "Your first ${CategoryConfig.MAX_STARRED} picks get a star — " +
+                "those show up most often in your feed.",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 28.dp),
+        )
+
+        Spacer(Modifier.height(10.dp))
 
         // Bounded scrollable chip area — narrower (horizontal padding 32dp
         // versus the older 20dp) and capped at a max height of 300dp so it
@@ -449,16 +481,21 @@ internal fun CategoryPickerStep(
             ) {
                 visible.forEach { category ->
                     val isSelected = category in selected
+                    val isStarred = category in starred
                     CategoryChip(
                         label = category,
                         selected = isSelected,
-                        onClick = {
-                            selected = if (isSelected) {
-                                selected - category
-                            } else if (selected.size >= MAX_SELECTION) {
-                                selected
+                        starred = isStarred,
+                        onToggle = {
+                            // Read current state at click time so a rapid
+                            // double-tap doesn't fall through stale captures.
+                            val current = orderedSelection
+                            orderedSelection = if (category in current) {
+                                current - category
+                            } else if (current.size < MAX_SELECTION) {
+                                current + category
                             } else {
-                                selected + category
+                                current
                             }
                         },
                     )
@@ -471,8 +508,9 @@ internal fun CategoryPickerStep(
         // navigation bar.
         Spacer(Modifier.weight(1f))
 
-        val count = selected.size
-        val message = when {
+        val count = orderedSelection.size
+        val starCount = starred.size
+        val selectionMessage = when {
             count < MIN_SELECTION ->
                 "Pick at least ${MIN_SELECTION - count} more " +
                     "($count/$MIN_SELECTION)"
@@ -482,13 +520,20 @@ internal fun CategoryPickerStep(
                 "$count selected"
         }
         Text(
-            text = message,
+            text = selectionMessage,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (count >= MIN_SELECTION) {
+            Text(
+                text = "$starCount top pick" + if (starCount == 1) "" else "s",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Spacer(Modifier.height(14.dp))
         NextArrowButton(
-            onClick = { onNext(selected) },
+            onClick = { onNext(selected, starred) },
             enabled = count in MIN_SELECTION..MAX_SELECTION,
         )
 
@@ -507,22 +552,53 @@ internal fun CategoryPickerStep(
 private fun CategoryChip(
     label: String,
     selected: Boolean,
-    onClick: () -> Unit,
+    starred: Boolean,
+    onToggle: () -> Unit,
 ) {
+    val container = when {
+        starred -> MaterialTheme.colorScheme.tertiaryContainer
+        selected -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val content = when {
+        starred -> MaterialTheme.colorScheme.onTertiaryContainer
+        selected -> MaterialTheme.colorScheme.onSecondaryContainer
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+
     Surface(
-        onClick = onClick,
+        onClick = onToggle,
         shape = CircleShape,
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer
-                else MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
-                       else MaterialTheme.colorScheme.onSurface,
+        color = container,
+        contentColor = content,
         tonalElevation = if (selected) 0.dp else 1.dp,
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-        )
+        Row(
+            modifier = Modifier.padding(
+                start = 16.dp,
+                end = if (starred) 12.dp else 16.dp,
+                top = 8.dp,
+                bottom = 8.dp,
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+            )
+            // Filled star ONLY on starred chips. Selected-but-not-starred
+            // chips have no star icon at all — selection order drives which
+            // chips become top picks, no separate tap target.
+            if (starred) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = "Top pick",
+                    tint = content,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
     }
 }
 

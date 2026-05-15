@@ -2,6 +2,7 @@ package com.example.freshwall.ui.detail
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,7 +42,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -53,8 +59,18 @@ import com.example.freshwall.actions.ApplyTarget
 import com.example.freshwall.data.Wallpaper
 
 /**
+ * Vertical drag distance, in dp, that opens the info sheet when the user
+ * flicks the drag-handle pill upward. Chosen to feel intentional without
+ * making the gesture finicky — anything past this and the info sheet opens
+ * on release.
+ */
+private const val DRAG_OPEN_INFO_DP = 40
+
+/**
  * Bottom action sheet for the detail screen.
  * Header: [avatar][photographer + dimensions][info icon]. Body: Apply/Download.
+ * Bonus: the drag-handle pill at the top accepts an upward flick to open the
+ * info sheet, mirroring the standard "pull up to expand" bottom-sheet idiom.
  */
 @Composable
 internal fun DetailActionSheet(
@@ -77,14 +93,50 @@ internal fun DetailActionSheet(
                 .navigationBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
+            // Drag-handle pill. The visible pill stays the same small chip
+            // it always was, but the gesture target around it is enlarged
+            // so an upward flick from the user's thumb reliably catches.
+            // Dragging it up past DRAG_OPEN_INFO_DP and releasing opens the
+            // info sheet — same destination as tapping the explicit info
+            // icon, just a more natural "pull up to expand" gesture.
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .size(width = 32.dp, height = 4.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.outlineVariant),
-            )
-            Spacer(Modifier.size(16.dp))
+                    .size(width = 80.dp, height = 24.dp)
+                    .pointerInput(Unit) {
+                        val thresholdPx = DRAG_OPEN_INFO_DP.dp.toPx()
+                        var dragAmount = 0f
+                        detectVerticalDragGestures(
+                            onDragStart = { dragAmount = 0f },
+                            onDragEnd = {
+                                if (dragAmount < -thresholdPx) onInfoClick()
+                                dragAmount = 0f
+                            },
+                            onDragCancel = { dragAmount = 0f },
+                            onVerticalDrag = { _, delta -> dragAmount += delta },
+                        )
+                    }
+                    // TalkBack users can't do the vertical-drag gesture, so
+                    // surface the same action as a semantic click. The
+                    // explicit Info icon button still works too — this just
+                    // gives the handle itself an accessible affordance.
+                    .semantics {
+                        role = Role.Button
+                        onClick(label = "Open photo details") {
+                            onInfoClick()
+                            true
+                        }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 32.dp, height = 4.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.outlineVariant),
+                )
+            }
+            Spacer(Modifier.size(8.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

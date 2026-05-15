@@ -19,25 +19,33 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -97,6 +105,11 @@ fun DetailScreen(
     var imageSize by remember(wallpaper.id) { mutableStateOf<IntSize?>(null) }
     var isImmersive by remember(wallpaper.id) { mutableStateOf(false) }
     var hasSetInitialScale by remember(wallpaper.id) { mutableStateOf(false) }
+    // Bumped when the user taps the in-screen retry message. Used as a key
+    // around the SubcomposeAsyncImage so Coil re-issues the request from
+    // scratch (defeats both Coil's success-state-cache and any pending
+    // failure latch).
+    var retryToken by remember(wallpaper.id) { mutableIntStateOf(0) }
 
     // Once both image and view are measured, auto-zoom so the image visually
     // fills the screen — the look of ContentScale.Crop, but the underlying
@@ -173,73 +186,89 @@ fun DetailScreen(
                 .background(Color.Black)
                 .onSizeChanged { viewSize = it },
         ) {
-            SubcomposeAsyncImage(
-                model = wallpaper.fullUrl,
-                contentDescription = null,
-                // Fit = the WHOLE image is always rendered, never cropped.
-                // For portrait images on portrait phones, this naturally
-                // fills the width (with vertical letterbox for the rest).
-                // Pinch in for closeups; the image is always recoverable.
-                contentScale = ContentScale.Fit,
-                onSuccess = { state ->
-                    val drawable = state.result.drawable
-                    val w = drawable.intrinsicWidth
-                    val h = drawable.intrinsicHeight
-                    if (w > 0 && h > 0) imageSize = IntSize(w, h)
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .sharedElement(
-                        sharedContentState = rememberSharedContentState(key = "image-${wallpaper.id}"),
-                        animatedVisibilityScope = animatedVisibilityScope,
-                    )
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale,
-                        translationX = offsetX,
-                        translationY = offsetY,
-                    )
-                    .pointerInput(wallpaper.id) {
-                        detectTapGestures(
-                            onTap = { isImmersive = !isImmersive },
-                            onDoubleTap = { onLikeToggle() },
-                        )
-                    }
-                    .pointerInput(wallpaper.id, viewSize, imageSize) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            val newScale = (scale * zoom).coerceIn(MIN_SCALE, MAX_SCALE)
-                            val max = computeMaxOffsets(viewSize, imageSize, newScale)
-                            scale = newScale
-                            // Pan multiplier: at higher zoom, each finger-pixel
-                            // moves the image by more so the perceived speed of
-                            // covering image content matches what it feels like
-                            // at zoom = 1.
-                            val panMul = newScale
-                            offsetX = (offsetX + pan.x * panMul).coerceIn(-max.x, max.x)
-                            offsetY = (offsetY + pan.y * panMul).coerceIn(-max.y, max.y)
-                        }
+            // key(retryToken) forces a full re-mount of the AsyncImage when
+            // the user taps "retry" in the error state — that's the only
+            // reliable way to defeat Coil's per-key error latching.
+            key(retryToken) {
+                SubcomposeAsyncImage(
+                    model = wallpaper.fullUrl,
+                    contentDescription = null,
+                    // Fit = the WHOLE image is always rendered, never cropped.
+                    // For portrait images on portrait phones, this naturally
+                    // fills the width (with vertical letterbox for the rest).
+                    // Pinch in for closeups; the image is always recoverable.
+                    contentScale = ContentScale.Fit,
+                    onSuccess = { state ->
+                        val drawable = state.result.drawable
+                        val w = drawable.intrinsicWidth
+                        val h = drawable.intrinsicHeight
+                        if (w > 0 && h > 0) imageSize = IntSize(w, h)
                     },
-                loading = {
-                    AsyncImage(
-                        model = wallpaper.thumbnailUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .blur(20.dp),
-                    )
-                },
-                error = {
-                    AsyncImage(
-                        model = wallpaper.thumbnailUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .blur(20.dp),
-                    )
-                },
-            )
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .sharedElement(
+                            sharedContentState = rememberSharedContentState(key = "image-${wallpaper.id}"),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offsetX,
+                            translationY = offsetY,
+                        )
+                        .pointerInput(wallpaper.id) {
+                            detectTapGestures(
+                                onTap = { isImmersive = !isImmersive },
+                                onDoubleTap = { onLikeToggle() },
+                            )
+                        }
+                        .pointerInput(wallpaper.id, viewSize, imageSize) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                val newScale = (scale * zoom).coerceIn(MIN_SCALE, MAX_SCALE)
+                                val max = computeMaxOffsets(viewSize, imageSize, newScale)
+                                scale = newScale
+                                // Pan multiplier: at higher zoom, each finger-pixel
+                                // moves the image by more so the perceived speed of
+                                // covering image content matches what it feels like
+                                // at zoom = 1.
+                                val panMul = newScale
+                                offsetX = (offsetX + pan.x * panMul).coerceIn(-max.x, max.x)
+                                offsetY = (offsetY + pan.y * panMul).coerceIn(-max.y, max.y)
+                            }
+                        },
+                    loading = {
+                        AsyncImage(
+                            model = wallpaper.thumbnailUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .blur(20.dp),
+                        )
+                    },
+                    error = {
+                        // Full-res failed. Fall back to the thumbnail — most
+                        // of the time it's still in Coil's disk cache from
+                        // the grid view, so the user sees something. Only if
+                        // the thumbnail ALSO fails (offline + cache miss) do
+                        // we surface the centred retry UI.
+                        SubcomposeAsyncImage(
+                            model = wallpaper.thumbnailUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .blur(20.dp),
+                            loading = {
+                                Box(Modifier.fillMaxSize().background(Color.Black))
+                            },
+                            error = {
+                                DetailLoadErrorView(onRetry = { retryToken++ })
+                            },
+                        )
+                    },
+                )
+            }
 
             FilledIconButton(
                 onClick = onBack,
@@ -426,4 +455,40 @@ private suspend fun runDownload(
     val result = actions.downloadToGallery(wallpaper, "freshwall-${wallpaper.id}")
     val msg = if (result.isSuccess) "Saved to gallery" else "Download failed"
     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+}
+
+/**
+ * Shown when both the full-resolution wallpaper URL AND its thumbnail
+ * fail to load (typically: offline + Coil cache miss). The whole surface
+ * is the tap target — tapping fires [onRetry] which the caller turns into
+ * a fresh image request.
+ */
+@Composable
+private fun DetailLoadErrorView(onRetry: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .clickable(onClick = onRetry),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Outlined.CloudOff,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.7f),
+                modifier = Modifier.size(48.dp),
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "Couldn't load wallpaper",
+                color = Color.White,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Tap to retry",
+                color = Color.White.copy(alpha = 0.7f),
+            )
+        }
+    }
 }

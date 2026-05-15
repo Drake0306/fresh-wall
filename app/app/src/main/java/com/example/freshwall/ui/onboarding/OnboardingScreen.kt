@@ -86,6 +86,9 @@ fun OnboardingScreen(
     var combinedSelection by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pexelsSelection by remember { mutableStateOf<Set<String>>(emptySet()) }
     var unsplashSelection by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var combinedStarred by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var pexelsStarred by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var unsplashStarred by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     // Local-asset mosaic that sits behind both Welcome and Purpose. Built
     // once per onboarding visit; Purpose re-shuffles the same pool so the
@@ -108,6 +111,9 @@ fun OnboardingScreen(
             combined = combinedSelection.toList(),
             pexels = pexelsSelection.toList(),
             unsplash = unsplashSelection.toList(),
+            combinedStarred = combinedStarred.toList(),
+            pexelsStarred = pexelsStarred.toList(),
+            unsplashStarred = unsplashStarred.toList(),
         )
         onFinished()
     }
@@ -169,8 +175,10 @@ fun OnboardingScreen(
                         "Choose 5 to 15.",
                     headerAccent = TopHeaderAccent.Combined(imageUrl = combinedBg),
                     initialSelection = combinedSelection,
-                    onNext = { selection ->
+                    initialStarred = combinedStarred,
+                    onNext = { selection, starred ->
                         combinedSelection = selection
+                        combinedStarred = starred
                         finish()
                     },
                 )
@@ -180,8 +188,10 @@ fun OnboardingScreen(
                     subtitle = "What should we pull from Pexels? Choose 5 to 15.",
                     headerAccent = TopHeaderAccent.Pexels(imageUrl = pexelsBg),
                     initialSelection = pexelsSelection,
-                    onNext = { selection ->
+                    initialStarred = pexelsStarred,
+                    onNext = { selection, starred ->
                         pexelsSelection = selection
+                        pexelsStarred = starred
                         step = OnboardingStep.UnsplashPicker
                     },
                 )
@@ -191,8 +201,10 @@ fun OnboardingScreen(
                     subtitle = "And what should we pull from Unsplash? Choose 5 to 15.",
                     headerAccent = TopHeaderAccent.Unsplash(imageUrl = unsplashBg),
                     initialSelection = unsplashSelection,
-                    onNext = { selection ->
+                    initialStarred = unsplashStarred,
+                    onNext = { selection, starred ->
                         unsplashSelection = selection
+                        unsplashStarred = starred
                         finish()
                     },
                 )
@@ -519,6 +531,15 @@ fun CategoryEditorScreen(
     var unsplashSelection by remember {
         mutableStateOf(current.unsplashCategories.toSet())
     }
+    var combinedStarred by remember {
+        mutableStateOf(current.combinedStarred.toSet())
+    }
+    var pexelsStarred by remember {
+        mutableStateOf(current.pexelsStarred.toSet())
+    }
+    var unsplashStarred by remember {
+        mutableStateOf(current.unsplashStarred.toSet())
+    }
 
     val modeSelectBg = remember { MOUNTAIN_IMAGE_URLS.random() }
     val combinedBg = remember { MOUNTAIN_IMAGE_URLS.random() }
@@ -532,6 +553,9 @@ fun CategoryEditorScreen(
                 combinedCategories = combinedSelection.toList(),
                 pexelsCategories = pexelsSelection.toList(),
                 unsplashCategories = unsplashSelection.toList(),
+                combinedStarred = combinedStarred.toList(),
+                pexelsStarred = pexelsStarred.toList(),
+                unsplashStarred = unsplashStarred.toList(),
             )
         }
         onDone()
@@ -580,8 +604,10 @@ fun CategoryEditorScreen(
                     subtitle = "These drive both Pexels and Unsplash. Pick 5 to 15.",
                     headerAccent = TopHeaderAccent.Combined(imageUrl = combinedBg),
                     initialSelection = combinedSelection,
-                    onNext = { selection ->
+                    initialStarred = combinedStarred,
+                    onNext = { selection, starred ->
                         combinedSelection = selection
+                        combinedStarred = starred
                         commit()
                     },
                 )
@@ -591,8 +617,10 @@ fun CategoryEditorScreen(
                     subtitle = "What should we pull from Pexels? Pick 5 to 15.",
                     headerAccent = TopHeaderAccent.Pexels(imageUrl = pexelsBg),
                     initialSelection = pexelsSelection,
-                    onNext = { selection ->
+                    initialStarred = pexelsStarred,
+                    onNext = { selection, starred ->
                         pexelsSelection = selection
+                        pexelsStarred = starred
                         step = EditorStep.UnsplashPicker
                     },
                 )
@@ -602,8 +630,10 @@ fun CategoryEditorScreen(
                     subtitle = "And from Unsplash? Pick 5 to 15.",
                     headerAccent = TopHeaderAccent.Unsplash(imageUrl = unsplashBg),
                     initialSelection = unsplashSelection,
-                    onNext = { selection ->
+                    initialStarred = unsplashStarred,
+                    onNext = { selection, starred ->
                         unsplashSelection = selection
+                        unsplashStarred = starred
                         commit()
                     },
                 )

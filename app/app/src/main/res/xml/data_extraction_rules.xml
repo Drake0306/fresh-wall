@@ -1,19 +1,26 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Auto-backup + device-transfer rules.
+
+  Default behaviour (no <include> here) backs up *every* SharedPreferences
+  file we own:
+    - freshwall_prefs      → theme mode, source toggles, category selection
+    - freshwall_favorites  → user's favorited wallpapers
+    - freshwall_autorotate → auto-rotate config
+
+  Coil's image disk cache and the OkHttp API cache both live under cacheDir,
+  which Android auto-excludes from backup; they don't need to be listed here.
+
+  We DO explicitly exclude:
+    - freshwall_search  → search history. Treated as personal/transient; we
+                          don't want past queries following a user to a new
+                          device or restoring from a months-old backup.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="sharedpref" path="freshwall_search.xml" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="sharedpref" path="freshwall_search.xml" />
     </device-transfer>
-    -->
 </data-extraction-rules>

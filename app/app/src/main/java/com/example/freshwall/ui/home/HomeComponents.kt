@@ -6,7 +6,12 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -21,11 +26,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -96,7 +105,11 @@ fun HomeTitleBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
+            // Small top padding lifts the pill clear of the status bar but
+            // keeps it visually high in the top region; the large bottom
+            // padding opens a clear breathing gap between the pill and the
+            // first row of grid tiles below.
+            .padding(top = 10.dp, bottom = 44.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -383,6 +396,53 @@ private fun CategoryChip(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
         )
     }
+}
+
+/**
+ * Greyed-out placeholder grid shown while the first page of a feed is in
+ * flight. Renders [tileCount] tiles in the same 9:16 aspect / rounded shape
+ * as [WallpaperTile] so the layout doesn't pop when real results arrive.
+ * Each tile breathes between two alpha values to signal "loading" without
+ * the heavyweight shimmer animation.
+ */
+@Composable
+fun WallpaperGridSkeleton(
+    contentPadding: PaddingValues,
+    modifier: Modifier = Modifier,
+    columns: Int = 2,
+    tileCount: Int = 8,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(columns),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = contentPadding,
+        userScrollEnabled = false,
+        modifier = modifier.fillMaxSize(),
+    ) {
+        items(tileCount) { SkeletonTile() }
+    }
+}
+
+@Composable
+private fun SkeletonTile() {
+    val transition = rememberInfiniteTransition(label = "skeleton")
+    val alpha by transition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 0.85f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "skeleton-alpha",
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(9f / 16f)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = alpha)),
+    )
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)

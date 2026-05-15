@@ -30,14 +30,18 @@ data class PexelsHomeUiState(
     val isRefreshing: Boolean = false,
     val allLoaded: Boolean = false,
     val error: String? = null,
-    /** Which category from the user's selection is currently driving the feed.
-     *  `null` means "no selection — fell back to curated browse". */
-    val activeCategory: String? = null,
 )
 
 /**
- * Owns the "Pexels" home tab state. Lazy-loads `PAGE_SIZE` items on first tab
- * activation, then more pages on demand as the user scrolls near the end.
+ * Owns the "Pexels" home tab state. The feed rotates through every category
+ * the user picked in onboarding so the whole selection gets airtime rather
+ * than a single random pick driving the entire session.
+ *
+ * Each page request advances the rotation by one slot and pulls the next
+ * unseen page of that slot's category — so page 1 might be `mountains`,
+ * page 2 `sunset`, page 3 `forest`, and once the rotation wraps, page 4 is
+ * `mountains` page 2, etc. Pull-to-refresh reshuffles the rotation and
+ * resets per-category cursors.
  */
 class PexelsHomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -50,45 +54,99 @@ class PexelsHomeViewModel(application: Application) : AndroidViewModel(applicati
     private val _uiState = MutableStateFlow(PexelsHomeUiState())
     val uiState: StateFlow<PexelsHomeUiState> = _uiState.asStateFlow()
 
-    private var currentPage = 0
     private var initialised = false
     private val loadMoreMutex = Mutex()
-    /** Category we're currently paging through (null = fell back to /curated). */
-    private var activeCategory: String? = null
 
-    /** Picks one of the user's Pexels categories at random. Returns `null`
-     *  if the user has none selected — in that case the feed falls back to
-     *  Pexels' curated endpoint so the tab still shows something usable. */
-    private fun chooseCategory(): String? {
-        val pool = categoryPreferences.config.value.pexelsActive()
-        return pool.randomOrNull()
+    // Round-robin state for the user's selected categories.
+    private var categoryRotation: List<String> = emptyList()
+    private var rotationIndex: Int = 0
+    /** Last page successfully fetched for each rotation category. */
+    private val categoryPages: MutableMap<String, Int> = mutableMapOf()
+    /** Categories that returned a short page — no more content to pull. */
+    private val exhaustedCategories: MutableSet<String> = mutableSetOf()
+    /** Fallback cursor used when the user has no Pexels categories selected. */
+    private var curatedPage: Int = 0
+
+    private fun resetRotation() {
+        val config = categoryPreferences.config.value
+        val active = config.pexelsActive()
+        val starred = config.pexelsStarredActive()
+        // Weighted rotation: starred categories appear STARRED_WEIGHT times in
+        // the rotation list, unstarred appear once. With a 3:1 ratio and the
+        // 3-star cap, a fully-starred user sees ~70%+ of pages drawn from
+        // their top picks while the rest of the selection still shows up.
+        categoryRotation = active.flatMap { category ->
+            val weight = if (category in starred) STARRED_WEIGHT else 1
+            List(weight) { category }
+        }.shuffled()
+        rotationIndex = 0
+        categoryPages.clear()
+        exhaustedCategories.clear()
+        curatedPage = 0
     }
 
-    private suspend fun fetchPage(page: Int, forceFresh: Boolean = false): Result<List<Wallpaper>> {
-        val category = activeCategory
-        return if (category == null) {
-            repository.curated(page = page, perPage = PAGE_SIZE, forceFresh = forceFresh)
-        } else {
-            repository.search(category, page = page, perPage = PAGE_SIZE, forceFresh = forceFresh)
+    private companion object {
+        const val STARRED_WEIGHT = 3
+    }
+
+    /**
+     * Picks the next category in the rotation and pulls its next unseen page.
+     * Falls back to Pexels' curated browse when the user has no categories.
+     * Returns `Result.success(emptyList())` once every selected category is
+     * exhausted — the caller treats that as `allLoaded`.
+     */
+    private suspend fun fetchNext(forceFresh: Boolean = false): Result<List<Wallpaper>> {
+        if (categoryRotation.isEmpty()) {
+            val page = curatedPage + 1
+            return repository.curated(
+                page = page, perPage = PAGE_SIZE, forceFresh = forceFresh,
+            ).also { result ->
+                result.onSuccess { list -> if (list.isNotEmpty()) curatedPage = page }
+            }
         }
+
+        val pool = categoryRotation
+        val total = pool.size
+        for (offset in 0 until total) {
+            val idx = (rotationIndex + offset) % total
+            val candidate = pool[idx]
+            if (candidate in exhaustedCategories) continue
+
+            // Advance the rotation eagerly so a transient failure on this
+            // category doesn't pin the next loadMore() to the same slot.
+            rotationIndex = (idx + 1) % total
+            val nextPage = (categoryPages[candidate] ?: 0) + 1
+            val outcome = repository.search(
+                query = candidate,
+                page = nextPage,
+                perPage = PAGE_SIZE,
+                forceFresh = forceFresh,
+            )
+            outcome.onSuccess { list ->
+                if (list.isNotEmpty()) categoryPages[candidate] = nextPage
+                if (list.size < PAGE_SIZE) exhaustedCategories.add(candidate)
+            }
+            return outcome
+        }
+        return Result.success(emptyList())
     }
+
+    private fun isAllExhausted(): Boolean =
+        categoryRotation.isNotEmpty() && categoryRotation.all { it in exhaustedCategories }
 
     fun loadIfNeeded() {
         if (initialised || _uiState.value.isLoading) return
         initialised = true
-        activeCategory = chooseCategory()
+        resetRotation()
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val outcome = fetchPage(page = 1)
-            outcome
+            fetchNext(forceFresh = false)
                 .onSuccess { list ->
-                    currentPage = 1
                     _uiState.update {
                         PexelsHomeUiState(
                             wallpapers = list,
                             isLoading = false,
-                            allLoaded = list.size < PAGE_SIZE,
-                            activeCategory = activeCategory,
+                            allLoaded = list.isEmpty() || isAllExhausted(),
                         )
                     }
                     prefetchThumbnails(list)
@@ -96,34 +154,26 @@ class PexelsHomeViewModel(application: Application) : AndroidViewModel(applicati
                 .onFailure { e ->
                     initialised = false
                     _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = errorMessage(e),
-                        )
+                        it.copy(isLoading = false, error = errorMessage(e))
                     }
                 }
         }
     }
 
-    /** Pull-to-refresh entry point — picks a fresh random category from the
-     *  user's selection and re-fetches page 1. */
+    /** Pull-to-refresh entry point — re-shuffles the rotation and re-fetches. */
     fun refresh() {
         val state = _uiState.value
         if (state.isLoading || state.isRefreshing) return
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true, error = null) }
-            activeCategory = chooseCategory()
-            currentPage = 0
-            val outcome = fetchPage(page = 1, forceFresh = true)
-            outcome
+            resetRotation()
+            fetchNext(forceFresh = true)
                 .onSuccess { list ->
-                    currentPage = 1
                     _uiState.value = PexelsHomeUiState(
                         wallpapers = list,
                         isLoading = false,
                         isRefreshing = false,
-                        allLoaded = list.size < PAGE_SIZE,
-                        activeCategory = activeCategory,
+                        allLoaded = list.isEmpty() || isAllExhausted(),
                     )
                     prefetchThumbnails(list)
                 }
@@ -145,19 +195,16 @@ class PexelsHomeViewModel(application: Application) : AndroidViewModel(applicati
             if (!loadMoreMutex.tryLock()) return@launch
             try {
                 _uiState.update { it.copy(isLoadingMore = true) }
-                val nextPage = currentPage + 1
-                val outcome = fetchPage(page = nextPage)
-                outcome
+                fetchNext(forceFresh = false)
                     .onSuccess { list ->
                         if (list.isEmpty()) {
                             _uiState.update { it.copy(isLoadingMore = false, allLoaded = true) }
                         } else {
-                            currentPage = nextPage
                             _uiState.update {
                                 it.copy(
                                     wallpapers = (it.wallpapers + list).distinctBy { w -> w.id },
                                     isLoadingMore = false,
-                                    allLoaded = list.size < PAGE_SIZE,
+                                    allLoaded = isAllExhausted(),
                                 )
                             }
                             prefetchThumbnails(list)

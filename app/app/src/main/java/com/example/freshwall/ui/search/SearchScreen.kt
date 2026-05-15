@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -29,10 +28,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.NorthWest
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -71,20 +68,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.freshwall.FreshWallApplication
+import com.example.freshwall.data.WALLPAPER_CATEGORIES
 import com.example.freshwall.data.Wallpaper
 import com.example.freshwall.data.WallpaperSource
 import com.example.freshwall.data.searchSuggestions
 import com.example.freshwall.ui.components.LoadingMoreIndicator
 import com.example.freshwall.ui.featured.FeaturedViewModel
+import com.example.freshwall.ui.home.WallpaperGridSkeleton
 import com.example.freshwall.ui.home.WallpaperTile
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
-
-private val PEXELS_CATEGORIES = listOf(
-    "Nature", "Mountains", "Ocean", "Sunset", "Forest",
-    "Abstract", "Minimal", "Dark", "Neon", "Geometric",
-    "City", "Space", "Flowers", "Art", "Macro",
-)
 
 /** Custom Saver so the user's typed text + cursor position survive navigation. */
 private val TextFieldValueSaver: Saver<TextFieldValue, Any> = listSaver(
@@ -292,52 +285,32 @@ fun SearchScreen(
                 }
             }
 
-            // Category chips + filter indicator — only when a remote source
-            // is active (Featured search is just a local filter, so the
-            // category-quick-pick UI doesn't apply).
+            // Category quick-picks — only when a remote source is active
+            // (Featured search is a local filter, so the category-shortcut
+            // row doesn't apply). Uses the full WALLPAPER_CATEGORIES list so
+            // it matches what the user saw during onboarding.
             AnimatedVisibility(visible = isRemoteSearch) {
-                Column {
-                    LazyRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(PEXELS_CATEGORIES, key = { it }) { category ->
-                            val isSelected = submittedQuery.equals(category, ignoreCase = true)
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = {
-                                    val q = category.lowercase()
-                                    query = TextFieldValue(q, selection = TextRange(q.length))
-                                    searchViewModel.submit(q)
-                                    keyboard?.hide()
-                                },
-                                label = { Text(category) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                ),
-                            )
-                        }
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.AspectRatio,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "Showing portrait wallpapers",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(WALLPAPER_CATEGORIES, key = { it }) { category ->
+                        val isSelected = submittedQuery.equals(category, ignoreCase = true)
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                val q = category.lowercase()
+                                query = TextFieldValue(q, selection = TextRange(q.length))
+                                searchViewModel.submit(q)
+                                keyboard?.hide()
+                            },
+                            label = { Text(category) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
                         )
                     }
                 }
@@ -482,12 +455,9 @@ private fun SearchResults(
     gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
 ) {
     when {
-        isLoading -> Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            CircularProgressIndicator()
-        }
+        isLoading -> WallpaperGridSkeleton(
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp),
+        )
         error != null -> Box(
             modifier = Modifier
                 .fillMaxSize()

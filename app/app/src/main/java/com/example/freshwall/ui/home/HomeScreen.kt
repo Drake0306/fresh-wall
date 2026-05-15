@@ -31,7 +31,6 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -288,8 +287,8 @@ fun HomeScreen(
                 when (source) {
                     HomeSource.Featured -> {
                         when {
-                            uiState.isLoading -> CircularProgressIndicator(
-                                modifier = Modifier.align(Alignment.Center),
+                            uiState.isLoading -> WallpaperGridSkeleton(
+                                contentPadding = gridPadding,
                             )
                             uiState.unconfigured -> FeaturedEmptyState(
                                 title = "Wallpaper feed coming soon",
@@ -477,8 +476,8 @@ private fun BoxScope.RemoteSourceGrid(
     animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
     when {
-        isInitialLoading -> CircularProgressIndicator(
-            modifier = Modifier.align(Alignment.Center),
+        isInitialLoading -> WallpaperGridSkeleton(
+            contentPadding = contentPadding,
         )
         initialError != null -> Text(
             text = initialError,

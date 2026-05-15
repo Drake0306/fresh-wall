@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -31,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.imageLoader
@@ -63,6 +66,7 @@ fun SettingsScreen(
     val sourceConfig by app.sourcePreferences.config.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var cacheSizeLabel by remember { mutableStateOf("…") }
+    var showClearCacheConfirm by remember { mutableStateOf(false) }
 
     suspend fun refreshCacheSize() {
         val bytes = withContext(Dispatchers.IO) {
@@ -79,13 +83,17 @@ fun SettingsScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             SettingsTopBar(title = "Settings", onBack = onBack)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
+
+            SettingsSectionHeader("Appearance")
             SettingsRow(
                 icon = Icons.Outlined.Palette,
                 label = "Theme",
                 description = "Light, Dark, or System default",
                 onClick = onThemeClick,
             )
+
+            SettingsSectionHeader("Content")
             SettingsRow(
                 icon = Icons.Outlined.Category,
                 label = "Wallpaper preferences",
@@ -102,38 +110,66 @@ fun SettingsScreen(
                     app.sourcePreferences.update { it.copy(featured = checked) }
                 },
             )
+
+            SettingsSectionHeader("Storage")
+            SettingsRow(
+                icon = Icons.Outlined.DeleteSweep,
+                label = "Clear image cache",
+                description = "Currently using $cacheSizeLabel",
+                onClick = { showClearCacheConfirm = true },
+            )
+
+            SettingsSectionHeader("Feedback")
             SettingsRow(
                 icon = Icons.Outlined.Forum,
                 label = "Send feedback",
                 description = "Report a bug or suggest an improvement",
                 onClick = onFeedbackClick,
             )
-            SettingsRow(
-                icon = Icons.Outlined.DeleteSweep,
-                label = "Clear image cache",
-                description = "Currently using $cacheSizeLabel",
-                onClick = {
-                    scope.launch {
-                        withContext(Dispatchers.IO) {
-                            val loader = context.imageLoader
-                            loader.memoryCache?.clear()
-                            loader.diskCache?.clear()
-                        }
-                        refreshCacheSize()
-                        Toast.makeText(
-                            context,
-                            "Cache cleared",
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    }
-                },
-            )
+
             Spacer(
                 Modifier.height(
                     WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                 )
             )
         }
+    }
+
+    if (showClearCacheConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearCacheConfirm = false },
+            title = { Text("Clear image cache?") },
+            text = {
+                Text(
+                    "This frees up $cacheSizeLabel. Wallpapers you've already seen will be " +
+                        "re-downloaded the next time you open them.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearCacheConfirm = false
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                val loader = context.imageLoader
+                                loader.memoryCache?.clear()
+                                loader.diskCache?.clear()
+                            }
+                            refreshCacheSize()
+                            Toast.makeText(
+                                context,
+                                "Cache cleared",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    },
+                ) { Text("Clear") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearCacheConfirm = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 
@@ -167,6 +203,21 @@ fun SettingsTopBar(
             )
         }
     }
+}
+
+/**
+ * Small section label that groups related rows in the Settings list. Matches
+ * Material's category-header pattern: uppercase-ish small label in the
+ * primary tint, sitting above its rows with consistent padding.
+ */
+@Composable
+private fun SettingsSectionHeader(label: String) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
+    )
 }
 
 @Composable
