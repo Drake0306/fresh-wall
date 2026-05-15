@@ -18,12 +18,13 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -76,6 +77,7 @@ import io.github.drake0306.freshwall.ui.components.LoadingMoreIndicator
 import io.github.drake0306.freshwall.ui.featured.FeaturedViewModel
 import io.github.drake0306.freshwall.ui.home.WallpaperGridSkeleton
 import io.github.drake0306.freshwall.ui.home.WallpaperTile
+import io.github.drake0306.freshwall.util.rememberHaptics
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
@@ -154,7 +156,8 @@ fun SearchScreen(
         }
     }
 
-    val resultsGridState = rememberLazyGridState()
+    val resultsGridState = rememberLazyStaggeredGridState()
+    val haptics = rememberHaptics()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -279,7 +282,10 @@ fun SearchScreen(
                 items(sources, key = { it.first.name }) { (source, label) ->
                     FilterChip(
                         selected = searchSource == source,
-                        onClick = { searchViewModel.setSearchSource(source) },
+                        onClick = {
+                            haptics.tabSwitch()
+                            searchViewModel.setSearchSource(source)
+                        },
                         label = { Text(label) },
                     )
                 }
@@ -302,6 +308,7 @@ fun SearchScreen(
                         FilterChip(
                             selected = isSelected,
                             onClick = {
+                                haptics.click()
                                 val q = category.lowercase()
                                 query = TextFieldValue(q, selection = TextRange(q.length))
                                 searchViewModel.submit(q)
@@ -452,11 +459,11 @@ private fun SearchResults(
     onLoadMore: () -> Unit,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
-    gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
+    gridState: LazyStaggeredGridState,
 ) {
     when {
         isLoading -> WallpaperGridSkeleton(
-            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp),
+            contentPadding = PaddingValues(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 24.dp),
         )
         error != null -> Box(
             modifier = Modifier
@@ -480,12 +487,12 @@ private fun SearchResults(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        else -> LazyVerticalGrid(
+        else -> LazyVerticalStaggeredGrid(
             state = gridState,
-            columns = GridCells.Fixed(2),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp),
+            columns = StaggeredGridCells.Fixed(2),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalItemSpacing = 6.dp,
+            contentPadding = PaddingValues(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 24.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
             items(results, key = { it.id }) { w ->
@@ -504,7 +511,7 @@ private fun SearchResults(
             }
             if (isRemote && !allLoaded) {
                 item(
-                    span = { GridItemSpan(maxLineSpan) },
+                    span = StaggeredGridItemSpan.FullLine,
                     key = "loading_more",
                 ) {
                     LoadingMoreIndicator(

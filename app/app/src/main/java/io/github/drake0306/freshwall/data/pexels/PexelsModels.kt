@@ -19,6 +19,8 @@ internal data class PexelsCuratedResponse(
 @Serializable
 internal data class PexelsPhoto(
     val id: Long,
+    val width: Int = 0,
+    val height: Int = 0,
     val url: String = "",
     val photographer: String = "",
     @SerialName("photographer_url") val photographerUrl: String = "",
@@ -29,14 +31,19 @@ internal data class PexelsPhoto(
         id = "pexels:$id",
         name = alt.takeIf { it.isNotBlank() } ?: "Pexels photo",
         description = null,
-        // Consistent server-side portrait crop (800x1200) for grid tiles.
-        thumbnailUrl = src.portrait.ifEmpty { src.large },
+        // `large` is an aspect-preserving resize (long edge ≤ 940px). The
+        // staggered grid needs the original aspect so the tile's
+        // .aspectRatio(width/height) frames the whole image without a second
+        // centre-crop. `portrait` would force a 2:3 crop and break that.
+        thumbnailUrl = src.large.ifEmpty { src.medium.ifEmpty { src.portrait } },
         // Full-resolution original — no resize, no crop. UI handles zoom-to-fit.
         fullUrl = src.original.ifEmpty { src.large2x },
         author = photographer.takeIf { it.isNotBlank() },
         authorUrl = photographerUrl.takeIf { it.isNotBlank() },
         sourceUrl = url.takeIf { it.isNotBlank() },
         source = WallpaperSource.PEXELS,
+        width = width.takeIf { it > 0 },
+        height = height.takeIf { it > 0 },
     )
 }
 

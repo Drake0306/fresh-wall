@@ -3,14 +3,17 @@ package io.github.drake0306.freshwall.actions
 import android.app.WallpaperManager
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.drawable.BitmapDrawable
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
@@ -18,6 +21,8 @@ import io.github.drake0306.freshwall.data.Wallpaper
 import io.github.drake0306.freshwall.data.unsplash.UnsplashRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 
 enum class ApplyTarget(val flag: Int) {
     HOME(WallpaperManager.FLAG_SYSTEM),
@@ -45,6 +50,45 @@ class WallpaperActions(
     // Reuse the app-wide Coil singleton so this work shares the memory+disk cache
     // with the grid's AsyncImage loads (and doesn't double-allocate caches).
     private val imageLoader get() = context.imageLoader
+
+    /**
+     * Builds an Intent that launches the **system wallpaper cropper** for
+     * [wallpaper]. Caller is responsible for `startActivity(intent)` from
+     * an Activity context so the cropper lands on top of FreshWall's task —
+     * adding FLAG_ACTIVITY_NEW_TASK here would detach the cropper into its
+     * own task and back-press from it would skip FreshWall.
+     *
+     * The flow inside the system cropper: user pans / zooms, picks Home /
+     * Lock / Both, and confirms. The system handles `setBitmap` for us,
+     * which sidesteps the parallax double-stretch that affects apps that
+     * call `setBitmap` directly with a screen-sized bitmap.
+     *
+     * Returns `Result.failure` when the cropper isn't reachable (very old
+     * Android, stripped-down OEM image, etc.). Callers should fall back to
+     * [setAsWallpaper] in that case.
+     */
+    suspend fun buildSystemPickerIntent(wallpaper: Wallpaper): Result<Intent> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val bitmap = loadBitmap(wallpaper.fullUrl)
+                val dir = File(context.cacheDir, "wallpapers").apply { mkdirs() }
+                // Single fixed filename — replaces any prior pending pick so
+                // we don't accumulate cache cruft across multiple apply taps.
+                val file = File(dir, "pending.jpg")
+                FileOutputStream(file).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                }
+                val uri: Uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file,
+                )
+                WallpaperManager.getInstance(context)
+                    .getCropAndSetWallpaperIntent(uri)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    .also { fireTrackingHit(wallpaper) }
+            }
+        }
 
     suspend fun setAsWallpaper(
         wallpaper: Wallpaper,

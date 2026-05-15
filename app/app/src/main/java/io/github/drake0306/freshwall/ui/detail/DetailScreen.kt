@@ -1,7 +1,6 @@
 package io.github.drake0306.freshwall.ui.detail
 
 import android.Manifest
-import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
@@ -68,12 +67,12 @@ import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import io.github.drake0306.freshwall.FreshWallApplication
 import io.github.drake0306.freshwall.actions.ApplyTarget
-import io.github.drake0306.freshwall.actions.CropTransform
 import io.github.drake0306.freshwall.actions.WallpaperActions
-import io.github.drake0306.freshwall.ads.RewardedAdManager
+import io.github.drake0306.freshwall.ads.gateAndRun
 import io.github.drake0306.freshwall.data.FavoritesManager
 import io.github.drake0306.freshwall.data.Wallpaper
 import io.github.drake0306.freshwall.util.findActivity
+import io.github.drake0306.freshwall.util.rememberHaptics
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -133,7 +132,7 @@ fun DetailScreen(
         hasSetInitialScale = true
     }
 
-    var showApplySheet by remember { mutableStateOf(false) }
+    var isApplying by remember { mutableStateOf(false) }
     var showDownloadConfirm by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var burstLike by remember { mutableStateOf(false) }
@@ -145,7 +144,9 @@ fun DetailScreen(
         }
     }
 
+    val haptics = rememberHaptics()
     val onLikeToggle: () -> Unit = {
+        haptics.like()
         val nowFavorite = favoritesManager.toggle(wallpaper)
         if (nowFavorite) burstLike = true
     }
@@ -318,33 +319,24 @@ fun DetailScreen(
                 DetailActionSheet(
                     wallpaper = wallpaper,
                     imageSize = imageSize,
-                    onApplyClick = { showApplySheet = true },
+                    onApplyClick = {
+                        if (isApplying) return@DetailActionSheet
+                        gateAndRun(adManager, activity, context) {
+                            isApplying = true
+                            scope.launch {
+                                try {
+                                    runApply(actions, wallpaper, context)
+                                } finally {
+                                    isApplying = false
+                                }
+                            }
+                        }
+                    },
                     onDownloadClick = { showDownloadConfirm = true },
                     onInfoClick = { showInfoDialog = true },
                 )
             }
         }
-    }
-
-    if (showApplySheet) {
-        ApplyTargetSheet(
-            onDismiss = { showApplySheet = false },
-            onPick = { target ->
-                showApplySheet = false
-                val crop = if (viewSize.width > 0 && viewSize.height > 0) {
-                    CropTransform(
-                        viewWidth = viewSize.width,
-                        viewHeight = viewSize.height,
-                        scale = scale,
-                        offsetX = offsetX,
-                        offsetY = offsetY,
-                    )
-                } else null
-                gateAndRun(adManager, activity, context) {
-                    scope.launch { runApply(actions, wallpaper, target, crop, context) }
-                }
-            },
-        )
     }
 
     if (showDownloadConfirm) {
@@ -412,39 +404,34 @@ private fun computeMaxOffsets(view: IntSize, image: IntSize?, scale: Float): Off
     )
 }
 
-private fun gateAndRun(
-    adManager: RewardedAdManager,
-    activity: Activity?,
-    context: android.content.Context,
-    action: () -> Unit,
-) {
-    if (activity == null) {
-        action()
-        return
-    }
-    adManager.showAd(
-        activity = activity,
-        onRewardEarned = action,
-        onDismissedWithoutReward = {
-            Toast.makeText(context, "Watch the full ad to continue", Toast.LENGTH_SHORT).show()
-        },
-        onUnavailable = {
-            action()
-        },
-    )
-}
-
-
+/**
+ * Apply flow: hand the bitmap to the system wallpaper cropper so the user
+ * can pan, zoom, and choose Home / Lock / Both inside the system UI. This
+ * avoids the parallax double-stretch that happens when an app calls
+ * `setBitmap` directly with a screen-sized bitmap.
+ *
+ * Fallback: on stripped-down OEM ROMs that ship no cropper Activity,
+ * `startActivity` throws [ActivityNotFoundException] — we then fall back
+ * to the legacy direct-set path, applying to BOTH home and lock.
+ */
 private suspend fun runApply(
     actions: WallpaperActions,
     wallpaper: Wallpaper,
-    target: ApplyTarget,
-    crop: CropTransform?,
     context: android.content.Context,
 ) {
-    val result = actions.setAsWallpaper(wallpaper, target, crop)
-    val msg = if (result.isSuccess) "Wallpaper applied" else "Failed to apply wallpaper"
-    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    val intentResult = actions.buildSystemPickerIntent(wallpaper)
+    val intent = intentResult.getOrNull()
+    if (intent == null) {
+        Toast.makeText(context, "Couldn't prepare wallpaper", Toast.LENGTH_SHORT).show()
+        return
+    }
+    try {
+        context.startActivity(intent)
+    } catch (_: android.content.ActivityNotFoundException) {
+        val result = actions.setAsWallpaper(wallpaper, ApplyTarget.BOTH, null)
+        val msg = if (result.isSuccess) "Wallpaper applied" else "Failed to apply wallpaper"
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    }
 }
 
 private suspend fun runDownload(

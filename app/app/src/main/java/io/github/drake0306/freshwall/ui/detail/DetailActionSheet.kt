@@ -201,56 +201,6 @@ internal fun DetailActionSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun ApplyTargetSheet(
-    onDismiss: () -> Unit,
-    onPick: (ApplyTarget) -> Unit,
-) {
-    val sheetState = rememberModalBottomSheetState()
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-        ) {
-            Text(
-                text = "Apply wallpaper to",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-            )
-            Spacer(Modifier.size(4.dp))
-            ApplyOption(Icons.Outlined.Home, "Home screen") { onPick(ApplyTarget.HOME) }
-            ApplyOption(Icons.Outlined.Lock, "Lock screen") { onPick(ApplyTarget.LOCK) }
-            ApplyOption(Icons.Outlined.Smartphone, "Both") { onPick(ApplyTarget.BOTH) }
-        }
-    }
-}
-
-@Composable
-private fun ApplyOption(
-    icon: ImageVector,
-    label: String,
-    onClick: () -> Unit,
-) {
-    ListItem(
-        headlineContent = {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-        },
-        leadingContent = {
-            Icon(icon, contentDescription = null)
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-    )
-}
-
 @Composable
 internal fun DownloadConfirmDialog(
     wallpaper: Wallpaper,

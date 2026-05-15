@@ -61,8 +61,39 @@ internal fun WallpaperInfoSheet(
     imageSize: IntSize?,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        WallpaperInfoContent(
+            wallpaper = wallpaper,
+            imageSize = imageSize,
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 24.dp),
+        )
+    }
+}
+
+/**
+ * Body of the wallpaper-details card. Same content the info sheet shows on
+ * the detail screen — photographer avatar, name, bio, social pills, then
+ * the 2-column info grid. Extracted from [WallpaperInfoSheet] so the
+ * long-press preview popup can embed the identical card without the bottom
+ * sheet chrome.
+ *
+ * Caller is responsible for the surrounding scroll container and any
+ * bottom padding; this composable just renders the column of details.
+ */
+@Composable
+internal fun WallpaperInfoContent(
+    wallpaper: Wallpaper,
+    imageSize: IntSize?,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
 
     fun openExternal(url: String) {
         runCatching {
@@ -71,170 +102,165 @@ internal fun WallpaperInfoSheet(
     }
 
     val dims = imageSize?.takeIf { it.width > 0 && it.height > 0 }
+        ?: wallpaper.width?.let { w ->
+            wallpaper.height?.let { h ->
+                if (w > 0 && h > 0) IntSize(w, h) else null
+            }
+        }
     val megapixels = dims?.let {
         val mp = it.width.toLong() * it.height / 1_000_000L
         if (mp >= 1) "$mp MP" else "<1 MP"
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-    ) {
-        Column(
+    Column(modifier = modifier) {
+        Spacer(Modifier.size(8.dp))
+
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center,
+        ) {
+            PhotographerAvatar(
+                avatarUrl = wallpaper.authorAvatarUrl,
+                name = wallpaper.author,
+                size = 88.dp,
+            )
+        }
+        Spacer(Modifier.size(14.dp))
+
+        Text(
+            text = wallpaper.author ?: "Unknown",
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = 24.dp),
-        ) {
-            Spacer(Modifier.size(8.dp))
+                .padding(horizontal = 24.dp),
+        )
 
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                PhotographerAvatar(
-                    avatarUrl = wallpaper.authorAvatarUrl,
-                    name = wallpaper.author,
-                    size = 88.dp,
-                )
-            }
-            Spacer(Modifier.size(14.dp))
-
+        wallpaper.authorUsername?.let { username ->
             Text(
-                text = wallpaper.author ?: "Unknown",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                text = "@$username",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 24.dp, vertical = 2.dp),
             )
+        }
 
-            wallpaper.authorUsername?.let { username ->
+        SourceBadge(source = wallpaper.source)
+
+        wallpaper.authorBio?.let { bio ->
+            Spacer(Modifier.size(12.dp))
+            Text(
+                text = bio,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontStyle = FontStyle.Italic,
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp),
+            )
+        }
+
+        wallpaper.authorLocation?.let { location ->
+            Spacer(Modifier.size(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Place,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.size(4.dp))
                 Text(
-                    text = "@$username",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = location,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 2.dp),
                 )
             }
+        }
 
-            SourceBadge(source = wallpaper.source)
-
-            wallpaper.authorBio?.let { bio ->
-                Spacer(Modifier.size(12.dp))
-                Text(
-                    text = bio,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontStyle = FontStyle.Italic,
-                    ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 28.dp),
-                )
-            }
-
-            wallpaper.authorLocation?.let { location ->
-                Spacer(Modifier.size(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Place,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Spacer(Modifier.size(4.dp))
-                    Text(
-                        text = location,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        val socialLinks = buildSocialLinks(wallpaper)
+        if (socialLinks.isNotEmpty()) {
+            Spacer(Modifier.size(16.dp))
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                socialLinks.forEach { link ->
+                    SocialPill(
+                        label = link.label,
+                        icon = link.icon,
+                        onClick = { openExternal(link.url) },
                     )
                 }
             }
+        }
 
-            val socialLinks = buildSocialLinks(wallpaper)
-            if (socialLinks.isNotEmpty()) {
-                Spacer(Modifier.size(16.dp))
-                FlowRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    socialLinks.forEach { link ->
-                        SocialPill(
-                            label = link.label,
-                            icon = link.icon,
-                            onClick = { openExternal(link.url) },
+        Spacer(Modifier.size(20.dp))
+
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                InfoCard(
+                    label = "Dimensions",
+                    value = dims?.let { "${it.width} × ${it.height}" } ?: "—",
+                    modifier = Modifier.weight(1f),
+                )
+                InfoCard(
+                    label = "Quality",
+                    value = megapixels ?: "—",
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            val likes = wallpaper.likes
+            val swatch = wallpaper.dominantColor?.let(::parseHexColor)
+            if (likes != null || swatch != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (likes != null) {
+                        InfoCard(
+                            label = "Likes",
+                            value = formatCompact(likes),
+                            icon = Icons.Outlined.Favorite,
+                            modifier = Modifier.weight(1f),
                         )
                     }
+                    if (swatch != null) {
+                        ColorSwatchCard(
+                            hex = wallpaper.dominantColor!!,
+                            color = swatch,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if ((likes != null) xor (swatch != null)) {
+                        Spacer(Modifier.weight(1f))
+                    }
                 }
             }
 
-            Spacer(Modifier.size(20.dp))
-
-            Column(
-                modifier = Modifier.padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    InfoCard(
-                        label = "Dimensions",
-                        value = dims?.let { "${it.width} × ${it.height}" } ?: "—",
-                        modifier = Modifier.weight(1f),
-                    )
-                    InfoCard(
-                        label = "Quality",
-                        value = megapixels ?: "—",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-
-                val likes = wallpaper.likes
-                val swatch = wallpaper.dominantColor?.let(::parseHexColor)
-                if (likes != null || swatch != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        if (likes != null) {
-                            InfoCard(
-                                label = "Likes",
-                                value = formatCompact(likes),
-                                icon = Icons.Outlined.Favorite,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        if (swatch != null) {
-                            ColorSwatchCard(
-                                hex = wallpaper.dominantColor!!,
-                                color = swatch,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        if ((likes != null) xor (swatch != null)) {
-                            Spacer(Modifier.weight(1f))
-                        }
-                    }
-                }
-
-                wallpaper.sourceUrl?.let { url ->
-                    InfoCard(
-                        label = sourceLabel(wallpaper.source),
-                        value = "View original",
-                        icon = Icons.AutoMirrored.Outlined.OpenInNew,
-                        onClick = { openExternal(url) },
-                    )
-                }
+            wallpaper.sourceUrl?.let { url ->
+                InfoCard(
+                    label = sourceLabel(wallpaper.source),
+                    value = "View original",
+                    icon = Icons.AutoMirrored.Outlined.OpenInNew,
+                    onClick = { openExternal(url) },
+                )
             }
         }
     }

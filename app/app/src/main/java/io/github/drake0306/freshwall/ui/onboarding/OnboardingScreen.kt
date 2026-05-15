@@ -17,13 +17,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -48,8 +52,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import io.github.drake0306.freshwall.FreshWallApplication
+import io.github.drake0306.freshwall.util.rememberHaptics
 import io.github.drake0306.freshwall.R
 import io.github.drake0306.freshwall.data.CategoryConfig
 import io.github.drake0306.freshwall.data.CustomizationMode
@@ -437,7 +443,15 @@ private fun ModeSelectStep(
      * editor immediately see their previous choice. Null in onboarding.
      */
     currentMode: CustomizationMode? = null,
+    /**
+     * When non-null, a small floating "Reset" pill appears in the top-right
+     * corner. Tapping it shows a confirmation; confirming invokes [onReset]
+     * to wipe every category pick. Null in onboarding (nothing to reset yet).
+     */
+    onReset: (() -> Unit)? = null,
 ) {
+    var showResetConfirm by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -460,7 +474,8 @@ private fun ModeSelectStep(
         Spacer(Modifier.height(14.dp))
         Text(
             text = "Apply your category choices to both Pexels and Unsplash, " +
-                "or tune each source separately.",
+                "or tune each source separately. The button with a check is " +
+                "the mode you're using right now.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -470,10 +485,12 @@ private fun ModeSelectStep(
         Spacer(Modifier.weight(1f))
 
         Column(
-            modifier = Modifier.padding(
-                bottom = WindowInsets.navigationBars.asPaddingValues()
-                    .calculateBottomPadding() + 32.dp,
-            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    bottom = WindowInsets.navigationBars.asPaddingValues()
+                        .calculateBottomPadding() + 32.dp,
+                ),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -483,17 +500,115 @@ private fun ModeSelectStep(
                 primary = true,
                 isCurrent = currentMode == CustomizationMode.COMBINED,
             )
-            ModeOption(
-                label = "Customize each",
-                onClick = onSeparate,
-                primary = false,
-                isCurrent = currentMode == CustomizationMode.SEPARATE,
+            // Bottom row: the second mode pill is centered as before; the
+            // dustbin (when shown) floats at the right edge so it reads as
+            // a side action rather than a third happy-path choice.
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                ModeOption(
+                    label = "Customize each",
+                    onClick = onSeparate,
+                    primary = false,
+                    isCurrent = currentMode == CustomizationMode.SEPARATE,
+                )
+                if (onReset != null) {
+                    ResetIconButton(
+                        onClick = { showResetConfirm = true },
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 20.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    if (showResetConfirm && onReset != null) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Outlined.DeleteOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(36.dp),
+                )
+            },
+            title = {
+                Text(
+                    text = "Clear every pick?",
+                    textAlign = TextAlign.Center,
+                )
+            },
+            text = {
+                Text(
+                    text = "You'll start from a blank slate — every category " +
+                        "you've chosen will be wiped from both modes.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onReset()
+                        showResetConfirm = false
+                    },
+                ) {
+                    Text(
+                        text = "Clear",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirm = false }) { Text("Cancel") }
+            },
+        )
+    }
+}
+
+/**
+ * Circular dustbin icon button used to reset every category pick. Lives at
+ * the right edge of the second mode row so it reads as a destructive side
+ * action — not a third happy-path option. Red icon on a light error
+ * container so users notice before tapping.
+ */
+@Composable
+private fun ResetIconButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptics = rememberHaptics()
+    Surface(
+        onClick = {
+            haptics.open()
+            onClick()
+        },
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.error,
+        tonalElevation = 2.dp,
+        shadowElevation = 3.dp,
+        modifier = modifier.size(44.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Outlined.DeleteOutline,
+                contentDescription = "Reset every category pick",
+                modifier = Modifier.size(22.dp),
             )
         }
     }
 }
 
-/** Pill button + optional "Currently set" hint when this is the saved mode. */
+/**
+ * Pill button for a mode option. When this is the mode currently in use,
+ * a small check icon appears inside the pill — replacing the older
+ * "Currently set" caption so the indicator can't desync from the button.
+ */
 @Composable
 private fun ModeOption(
     label: String,
@@ -501,17 +616,12 @@ private fun ModeOption(
     primary: Boolean,
     isCurrent: Boolean,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        CompactPillButton(label = label, onClick = onClick, primary = primary)
-        if (isCurrent) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "Currently set",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-    }
+    CompactPillButton(
+        label = label,
+        onClick = onClick,
+        primary = primary,
+        leadingIcon = if (isCurrent) Icons.Outlined.Check else null,
+    )
 }
 
 /**
@@ -546,7 +656,9 @@ fun CategoryEditorScreen(
 ) {
     val context = LocalContext.current
     val app = remember(context) { context.applicationContext as FreshWallApplication }
-    val current: CategoryConfig = app.categoryPreferences.config.value
+    // Reactive — so the mode-select screen picks up an in-place Reset
+    // without needing to leave and re-enter the editor.
+    val current: CategoryConfig by app.categoryPreferences.config.collectAsStateWithLifecycle()
 
     // Mini state machine: ModeSelect → Combined OR (Pexels → Unsplash).
     var step by remember {
@@ -575,6 +687,18 @@ fun CategoryEditorScreen(
     // The saved mode the user committed to last time. Distinct from `mode`
     // (the editor's working draft, which may change as they tap around).
     val savedMode = current.mode
+
+    // The mode that's *actually in use* — saved mode AND has picks in it.
+    // After a reset every list is empty, so this becomes null and the
+    // check icon on the pill disappears without needing a separate flag.
+    val activeMode: CustomizationMode? = when (savedMode) {
+        CustomizationMode.COMBINED ->
+            if (current.combinedCategories.isNotEmpty()) CustomizationMode.COMBINED else null
+        CustomizationMode.SEPARATE -> if (
+            current.pexelsCategories.isNotEmpty() ||
+            current.unsplashCategories.isNotEmpty()
+        ) CustomizationMode.SEPARATE else null
+    }
 
     // When non-null, the user has tapped a mode different from `savedMode`
     // and the confirmation dialog is showing.
@@ -651,9 +775,13 @@ fun CategoryEditorScreen(
             when (current) {
                 EditorStep.ModeSelect -> ModeSelectStep(
                     backgroundImageUrl = modeSelectBg,
-                    currentMode = savedMode,
+                    currentMode = activeMode,
                     onCombined = {
-                        if (savedMode == CustomizationMode.COMBINED) {
+                        // Warn only when there's actually something to lose
+                        // by switching — i.e. the saved mode is different
+                        // AND it currently has picks. After a reset both
+                        // sides are empty, so we advance silently.
+                        if (activeMode != CustomizationMode.SEPARATE) {
                             mode = CustomizationMode.COMBINED
                             step = EditorStep.CombinedPicker
                         } else {
@@ -661,11 +789,35 @@ fun CategoryEditorScreen(
                         }
                     },
                     onSeparate = {
-                        if (savedMode == CustomizationMode.SEPARATE) {
+                        if (activeMode != CustomizationMode.COMBINED) {
                             mode = CustomizationMode.SEPARATE
                             step = EditorStep.PexelsPicker
                         } else {
                             pendingModeSwitch = CustomizationMode.SEPARATE
+                        }
+                    },
+                    onReset = {
+                        combinedSelection = emptySet()
+                        pexelsSelection = emptySet()
+                        unsplashSelection = emptySet()
+                        combinedStarred = emptySet()
+                        pexelsStarred = emptySet()
+                        unsplashStarred = emptySet()
+                        mode = CustomizationMode.COMBINED
+                        // Persist the wipe so the rest of the app sees a
+                        // fresh slate immediately. onboardingComplete stays
+                        // true — Reset clears picks, it doesn't kick the
+                        // user back to the welcome flow.
+                        app.categoryPreferences.update {
+                            it.copy(
+                                mode = CustomizationMode.COMBINED,
+                                combinedCategories = emptyList(),
+                                pexelsCategories = emptyList(),
+                                unsplashCategories = emptyList(),
+                                combinedStarred = emptyList(),
+                                pexelsStarred = emptyList(),
+                                unsplashStarred = emptyList(),
+                            )
                         }
                     },
                 )

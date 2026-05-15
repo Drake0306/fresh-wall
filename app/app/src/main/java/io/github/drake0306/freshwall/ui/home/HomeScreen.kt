@@ -25,12 +25,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -64,6 +64,7 @@ import io.github.drake0306.freshwall.ui.drawer.AppDrawer
 import io.github.drake0306.freshwall.ui.drawer.DrawerItem
 import io.github.drake0306.freshwall.ui.featured.FeaturedViewModel
 import io.github.drake0306.freshwall.ui.pexels.PexelsHomeViewModel
+import io.github.drake0306.freshwall.ui.preview.WallpaperPreviewPopup
 import io.github.drake0306.freshwall.ui.unsplash.UnsplashHomeViewModel
 import io.github.drake0306.freshwall.ui.components.LoadingMoreIndicator
 import androidx.compose.runtime.LaunchedEffect
@@ -101,6 +102,7 @@ fun HomeScreen(
     // source, we fall back to the first available source.
     var selectedSourceName by rememberSaveable { mutableStateOf<String?>(null) }
     var showDrawer by remember { mutableStateOf(false) }
+    var previewWallpaper by remember { mutableStateOf<Wallpaper?>(null) }
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -152,9 +154,9 @@ fun HomeScreen(
         }
     }
 
-    val gridState = rememberLazyGridState()
-    val pexelsGridState = rememberLazyGridState()
-    val unsplashGridState = rememberLazyGridState()
+    val gridState = rememberLazyStaggeredGridState()
+    val pexelsGridState = rememberLazyStaggeredGridState()
+    val unsplashGridState = rememberLazyStaggeredGridState()
 
     var selectedCategory by rememberSaveable { mutableStateOf(WallpaperCategory.ALL) }
     val featuredWallpapers = remember(uiState.wallpapers, selectedCategory) {
@@ -262,8 +264,8 @@ fun HomeScreen(
         // tuck neatly behind the title pill at the top and the bottom nav
         // at the bottom.
         val gridPadding = PaddingValues(
-            start = 12.dp,
-            end = 12.dp,
+            start = 4.dp,
+            end = 4.dp,
             top = statusBarTopDp + tabHeightDp + 8.dp,
             bottom = navBarBottomDp + barHeightDp + barLiftDp + 8.dp,
         )
@@ -312,16 +314,16 @@ fun HomeScreen(
                                 onRefresh = { viewModel.refresh() },
                                 modifier = Modifier.fillMaxSize(),
                             ) {
-                                LazyVerticalGrid(
+                                LazyVerticalStaggeredGrid(
                                     state = gridState,
-                                    columns = GridCells.Fixed(2),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    columns = StaggeredGridCells.Fixed(2),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalItemSpacing = 6.dp,
                                     contentPadding = gridPadding,
                                     modifier = Modifier.fillMaxSize(),
                                 ) {
                                     item(
-                                        span = { GridItemSpan(maxLineSpan) },
+                                        span = StaggeredGridItemSpan.FullLine,
                                         key = "categories",
                                     ) {
                                         CategoryChipsRow(
@@ -337,6 +339,7 @@ fun HomeScreen(
                                             onFavoriteClick = { favoritesManager.toggle(w) },
                                             sharedTransitionScope = sharedTransitionScope,
                                             animatedVisibilityScope = animatedVisibilityScope,
+                                            onLongClick = { previewWallpaper = w },
                                         )
                                     }
                                 }
@@ -356,6 +359,7 @@ fun HomeScreen(
                         onLoadMore = { pexelsViewModel.loadMore() },
                         favoriteIds = favoriteIds,
                         onWallpaperClick = onWallpaperClick,
+                        onWallpaperLongClick = { previewWallpaper = it },
                         onFavoriteToggle = { favoritesManager.toggle(it) },
                         sharedTransitionScope = sharedTransitionScope,
                         animatedVisibilityScope = animatedVisibilityScope,
@@ -373,6 +377,7 @@ fun HomeScreen(
                         onLoadMore = { unsplashViewModel.loadMore() },
                         favoriteIds = favoriteIds,
                         onWallpaperClick = onWallpaperClick,
+                        onWallpaperLongClick = { previewWallpaper = it },
                         onFavoriteToggle = { favoritesManager.toggle(it) },
                         sharedTransitionScope = sharedTransitionScope,
                         animatedVisibilityScope = animatedVisibilityScope,
@@ -448,6 +453,17 @@ fun HomeScreen(
             )
         }
     }
+
+    previewWallpaper?.let { w ->
+        WallpaperPreviewPopup(
+            wallpaper = w,
+            onOpenFullScreen = {
+                previewWallpaper = null
+                onWallpaperClick(w)
+            },
+            onDismiss = { previewWallpaper = null },
+        )
+    }
 }
 
 /**
@@ -459,7 +475,7 @@ fun HomeScreen(
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun BoxScope.RemoteSourceGrid(
-    gridState: LazyGridState,
+    gridState: LazyStaggeredGridState,
     contentPadding: PaddingValues,
     wallpapers: List<Wallpaper>,
     isInitialLoading: Boolean,
@@ -471,6 +487,7 @@ private fun BoxScope.RemoteSourceGrid(
     onLoadMore: () -> Unit,
     favoriteIds: Set<String>,
     onWallpaperClick: (Wallpaper) -> Unit,
+    onWallpaperLongClick: (Wallpaper) -> Unit,
     onFavoriteToggle: (Wallpaper) -> Unit,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
@@ -491,11 +508,11 @@ private fun BoxScope.RemoteSourceGrid(
             onRefresh = onRefresh,
             modifier = Modifier.fillMaxSize(),
         ) {
-            LazyVerticalGrid(
+            LazyVerticalStaggeredGrid(
                 state = gridState,
-                columns = GridCells.Fixed(2),
+                columns = StaggeredGridCells.Fixed(2),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalItemSpacing = 8.dp,
                 contentPadding = contentPadding,
                 modifier = Modifier.fillMaxSize(),
             ) {
@@ -507,11 +524,12 @@ private fun BoxScope.RemoteSourceGrid(
                         onFavoriteClick = { onFavoriteToggle(w) },
                         sharedTransitionScope = sharedTransitionScope,
                         animatedVisibilityScope = animatedVisibilityScope,
+                        onLongClick = { onWallpaperLongClick(w) },
                     )
                 }
                 if (!allLoaded) {
                     item(
-                        span = { GridItemSpan(maxLineSpan) },
+                        span = StaggeredGridItemSpan.FullLine,
                         key = "loading_more",
                     ) {
                         LoadingMoreIndicator(

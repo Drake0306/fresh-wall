@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import io.github.drake0306.freshwall.util.rememberHaptics
 
 enum class DrawerItem {
     FAVORITES,
@@ -82,6 +83,7 @@ private fun DrawerRow(
     label: String,
     onClick: () -> Unit,
 ) {
+    val haptics = rememberHaptics()
     ListItem(
         headlineContent = { Text(label, style = MaterialTheme.typography.bodyLarge) },
         leadingContent = {
@@ -94,6 +96,9 @@ private fun DrawerRow(
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable {
+                haptics.click()
+                onClick()
+            },
     )
 }

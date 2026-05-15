@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.imageLoader
 import io.github.drake0306.freshwall.FreshWallApplication
+import io.github.drake0306.freshwall.util.rememberHaptics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -227,6 +228,7 @@ private fun SettingsRow(
     description: String,
     onClick: () -> Unit,
 ) {
+    val haptics = rememberHaptics()
     ListItem(
         headlineContent = { Text(label, style = MaterialTheme.typography.bodyLarge) },
         supportingContent = {
@@ -243,7 +245,10 @@ private fun SettingsRow(
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable {
+                haptics.click()
+                onClick()
+            },
     )
 }
 
@@ -255,6 +260,11 @@ private fun SettingsToggleRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
+    val haptics = rememberHaptics()
+    val hapticChange: (Boolean) -> Unit = { v ->
+        haptics.click()
+        onCheckedChange(v)
+    }
     ListItem(
         headlineContent = { Text(label, style = MaterialTheme.typography.bodyLarge) },
         supportingContent = {
@@ -266,12 +276,12 @@ private fun SettingsToggleRow(
         },
         leadingContent = { Icon(icon, contentDescription = null) },
         trailingContent = {
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
+            Switch(checked = checked, onCheckedChange = hapticChange)
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) },
+            .clickable { hapticChange(!checked) },
     )
 }
 

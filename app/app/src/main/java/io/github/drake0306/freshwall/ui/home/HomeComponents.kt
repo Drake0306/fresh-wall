@@ -21,6 +21,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,9 +36,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -73,6 +75,18 @@ import coil.compose.AsyncImage
 import io.github.drake0306.freshwall.R
 import io.github.drake0306.freshwall.data.Wallpaper
 import io.github.drake0306.freshwall.data.WallpaperSource
+import io.github.drake0306.freshwall.util.rememberHaptics
+
+// Tile-shape bounds for the staggered grid. Min keeps super-tall panoramas
+// from blowing out a column's height; max keeps ultra-wide panoramas from
+// collapsing to ribbons. Range is generous on purpose — common landscapes
+// (16:9 ≈ 1.78, 3:2 = 1.5) and portraits (9:16 ≈ 0.56, 2:3 ≈ 0.67) all
+// pass through unmodified, so the staggered effect actually reads as
+// "respects each photo's shape." Outside the range, the tile uses the
+// clamp value and ContentScale.Crop trims the source bitmap.
+private const val MIN_TILE_RATIO = 0.5f      // 1:2  — tallest portrait allowed
+private const val MAX_TILE_RATIO = 2.0f      // 2:1  — widest landscape allowed
+private const val DEFAULT_TILE_RATIO = 9f / 16f  // fallback when width/height missing
 
 /**
  * Centered "FreshWall" title shown at the top of the home screen.
@@ -194,6 +208,7 @@ fun BottomNavBar(
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = rememberHaptics()
     Row(
         modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -202,22 +217,23 @@ fun BottomNavBar(
         CircularNavPill(
             icon = Icons.Outlined.Menu,
             contentDescription = "Menu",
-            onClick = onMenuClick,
+            // Menu uses the open() double-bump so the drawer reveal *feels*
+            // like a panel sliding in, not a plain button press.
+            onClick = { haptics.open(); onMenuClick() },
         )
-        // Only render the tabs pill when there's actually a choice to make.
-        // With a single enabled source, the user has nothing to switch
-        // between, so the pill would just be visual noise.
         if (tabLabels.size > 1) {
             TabsPill(
                 labels = tabLabels,
                 selectedIndex = selectedIndex,
-                onTabSelected = onTabSelected,
+                onTabSelected = { i -> haptics.tabSwitch(); onTabSelected(i) },
             )
         }
         CircularNavPill(
             icon = Icons.Outlined.Search,
             contentDescription = "Search",
-            onClick = onSearchClick,
+            // Search uses the standard click() — distinct from the lighter
+            // tabSwitch() so the user can feel which pill they hit.
+            onClick = { haptics.click(); onSearchClick() },
         )
     }
 }
@@ -366,6 +382,7 @@ fun CategoryChipsRow(
     onSelect: (WallpaperCategory) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = rememberHaptics()
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -378,7 +395,10 @@ fun CategoryChipsRow(
             CategoryChip(
                 label = category.label,
                 selected = category == selected,
-                onClick = { onSelect(category) },
+                onClick = {
+                    haptics.click()
+                    onSelect(category)
+                },
             )
         }
     }
@@ -416,12 +436,20 @@ private fun CategoryChip(
     }
 }
 
+// Cycled across skeleton tiles so the loading state has the same varied-
+// height rhythm as the real staggered grid, instead of a uniform block of
+// 9:16 placeholders that would jolt into staggered layout when real tiles
+// arrive.
+private val SKELETON_RATIOS = listOf(
+    0.66f, 0.75f, 0.56f, 1.0f, 0.6f, 0.85f, 0.7f, 1.2f,
+)
+
 /**
  * Greyed-out placeholder grid shown while the first page of a feed is in
- * flight. Renders [tileCount] tiles in the same 9:16 aspect / rounded shape
- * as [WallpaperTile] so the layout doesn't pop when real results arrive.
- * Each tile breathes between two alpha values to signal "loading" without
- * the heavyweight shimmer animation.
+ * flight. Mirrors the real staggered layout (varied tile heights) so the
+ * page doesn't jolt when real results replace it. Each tile breathes
+ * between two alpha values to signal "loading" without the heavyweight
+ * shimmer animation.
  */
 @Composable
 fun WallpaperGridSkeleton(
@@ -430,20 +458,22 @@ fun WallpaperGridSkeleton(
     columns: Int = 2,
     tileCount: Int = 8,
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(columns),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    LazyVerticalStaggeredGrid(
+        columns = StaggeredGridCells.Fixed(columns),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalItemSpacing = 6.dp,
         contentPadding = contentPadding,
         userScrollEnabled = false,
         modifier = modifier.fillMaxSize(),
     ) {
-        items(tileCount) { SkeletonTile() }
+        items(tileCount) { index ->
+            SkeletonTile(ratio = SKELETON_RATIOS[index % SKELETON_RATIOS.size])
+        }
     }
 }
 
 @Composable
-private fun SkeletonTile() {
+private fun SkeletonTile(ratio: Float) {
     val transition = rememberInfiniteTransition(label = "skeleton")
     val alpha by transition.animateFloat(
         initialValue = 0.45f,
@@ -457,13 +487,13 @@ private fun SkeletonTile() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(9f / 16f)
-            .clip(RoundedCornerShape(16.dp))
+            .aspectRatio(ratio)
+            .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = alpha)),
     )
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun WallpaperTile(
     wallpaper: Wallpaper,
@@ -474,7 +504,9 @@ fun WallpaperTile(
     animatedVisibilityScope: AnimatedVisibilityScope,
     modifier: Modifier = Modifier,
     showSourceBadge: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
 ) {
+    val haptics = rememberHaptics()
     // Viewport-entry pop-in. Each tile's `hasAppeared` flips to true
     // exactly once per composition — which happens when the tile first
     // becomes visible (scrolled into view) or when a new page of items
@@ -491,6 +523,20 @@ fun WallpaperTile(
     )
     LaunchedEffect(wallpaper.id) { hasAppeared = true }
 
+    // Tile aspect ratio = the source photo's actual ratio (width / height),
+    // clamped to a sensible range so a stray panorama or skyscraper-portrait
+    // doesn't break the staggered layout. Falls back to 9:16 when the API
+    // didn't return dimensions (older manifest-served wallpapers).
+    val tileRatio = remember(wallpaper.width, wallpaper.height) {
+        val w = wallpaper.width
+        val h = wallpaper.height
+        if (w != null && h != null && w > 0 && h > 0) {
+            (w.toFloat() / h.toFloat()).coerceIn(MIN_TILE_RATIO, MAX_TILE_RATIO)
+        } else {
+            DEFAULT_TILE_RATIO
+        }
+    }
+
     with(sharedTransitionScope) {
         Box(
             modifier = modifier
@@ -498,10 +544,18 @@ fun WallpaperTile(
                     alpha = entryProgress
                     translationY = (1f - entryProgress) * 24.dp.toPx()
                 }
-                .aspectRatio(9f / 16f)
-                .clip(RoundedCornerShape(16.dp))
+                .aspectRatio(tileRatio)
+                .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable(onClick = onClick),
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick?.let { lc ->
+                        {
+                            haptics.longPress()
+                            lc()
+                        }
+                    },
+                ),
         ) {
             AsyncImage(
                 model = wallpaper.thumbnailUrl,
@@ -575,8 +629,12 @@ private fun FavoriteOverlayIcon(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = rememberHaptics()
     IconButton(
-        onClick = onClick,
+        onClick = {
+            haptics.like()
+            onClick()
+        },
         modifier = modifier,
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = Color.Black.copy(alpha = 0.25f),

@@ -1,20 +1,27 @@
 # FreshWall
 
 A modern wallpaper app for Android, built with Jetpack Compose and Material 3.
-Browse a hand-curated collection on the Featured tab, or search the entire
-[Pexels](https://www.pexels.com) library on the Pexels tab. Favorite what
-you like, set it as wallpaper, or schedule auto-rotation.
+Browse a hand-curated collection on the Featured tab, or search the
+[Pexels](https://www.pexels.com) and [Unsplash](https://unsplash.com)
+libraries from inside the app. Favorite what you like, set it as wallpaper
+through the system cropper, or schedule auto-rotation.
 
 ## Highlights
 
-- **Curated + community photos** — Featured tab ships with a bundled collection;
-  Pexels tab pulls from Pexels' free photography library at runtime.
-- **Apply wallpaper** to lock screen, home screen, or both, with an optional
-  rewarded-ad gate.
+- **Three sources, one feed** — Featured (bundled), Pexels, Unsplash. Toggleable
+  in Settings; each tab respects the categories picked during onboarding.
+- **Pinterest-style staggered grid** — every tile sizes to its source photo's
+  aspect ratio, so the grid mixes portraits, squares, and landscapes naturally.
+- **System wallpaper cropper** — Apply hands the bitmap off to Android's cropper
+  Intent so users can pan / zoom / pick Home / Lock / Both inside the system UI.
+  No more parallax double-stretch.
+- **Long-press preview popup** — touch-and-hold any tile for an animated card
+  with photographer attribution, dimensions, social links, and an Expand button.
+- **Haptic vocabulary** — distinct vibration signatures for tab switches, menu
+  open, search, filter chips, long-press, and "like" (CONFIRM on API 30+).
 - **Auto-rotate** wallpapers on a schedule via WorkManager, sourced from your
-  favorites or the Featured collection.
-- **Pinch-to-zoom detail view** with shared-element transitions back to the grid.
-- **Favorites** that persist across launches (Featured + Pexels alike).
+  favorites or the Featured collection. Enabling it is gated by a rewarded ad.
+- **Favorites** that persist across launches (Featured + Pexels + Unsplash).
 - **Light / Dark / System** theming with a pitch-black dark variant.
 
 ## Tech stack
@@ -41,18 +48,22 @@ fresh-wall/
     └── app/                   :app module
         └── src/main/
             ├── java/io/github/drake0306/freshwall/
-            │   ├── actions/            WallpaperActions, downloads
-            │   ├── ads/                Rewarded-ad gating
+            │   ├── actions/            WallpaperActions, system cropper Intent
+            │   ├── ads/                Rewarded-ad manager + gateAndRun helper
             │   ├── data/               Models, FavoritesManager, repositories
-            │   │   └── pexels/         PexelsRepository
+            │   │   ├── pexels/         PexelsRepository
+            │   │   └── unsplash/       UnsplashRepository + tracking pings
             │   ├── ui/
-            │   │   ├── home/           Home, hero, tabs, drawer
-            │   │   ├── detail/         Pinch-zoom detail + info sheet
+            │   │   ├── home/           Home, tabs, drawer, staggered tile
+            │   │   ├── detail/         Pinch-zoom detail + info sheet content
+            │   │   ├── preview/        Long-press preview popup (info + Expand)
             │   │   ├── search/         Search screen + view model
             │   │   ├── favorites/      Saved-wallpaper grid
             │   │   ├── settings/       Settings, About, Theme, Donate, Feedback
-            │   │   ├── autorotate/     Auto-rotate config
+            │   │   ├── onboarding/     Onboarding + CategoryEditor flow
+            │   │   ├── autorotate/     Auto-rotate config (ad-gated enable)
             │   │   └── theme/          M3 theme (light/dark/black)
+            │   ├── util/               Haptics, findActivity()
             │   ├── work/               AutoRotateWorker (WorkManager)
             │   ├── FreshWallApplication.kt  Singletons + Coil ImageLoader
             │   └── MainActivity.kt
@@ -174,11 +185,15 @@ suitable for direct-install testing.
 ## Known limitations
 
 - Pexels' free API caps requests at **200/hour, 20k/month**. The repository
-  uses a paged fetch (9 items/page) and a single in-flight request guard
-  (`Mutex.tryLock`) to stay well under the limit.
-- AdMob ad unit IDs in the codebase are **test IDs** — replace before release.
-- The donation URL, support email, and Firebase setup are placeholders. See
-  `PLAN.md` for the publishing checklist.
+  uses paged fetches and a single in-flight request guard (`Mutex.tryLock`)
+  to stay well under the limit.
+- The Featured-tab manifest needs per-wallpaper `width` / `height` for the
+  staggered grid to size tiles correctly; without them, those tiles fall
+  back to a uniform 9:16. Pexels and Unsplash carry dimensions natively.
+- AutoRotate's headless apply still uses `WallpaperManager.setBitmap` (the
+  system cropper Intent requires UI). That path can still show Android's
+  parallax stretch on some OEMs.
+- See `PRE_LAUNCH.md` for what's left before Play Store + Unsplash production.
 
 ## Contributing
 

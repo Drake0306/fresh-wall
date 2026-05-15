@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
+import io.github.drake0306.freshwall.util.rememberHaptics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -286,6 +287,7 @@ internal fun CompactPillButton(
     onClick: () -> Unit,
     primary: Boolean,
     enabled: Boolean = true,
+    leadingIcon: ImageVector? = null,
 ) {
     val container = when {
         !enabled -> MaterialTheme.colorScheme.surfaceContainerHigh
@@ -297,8 +299,12 @@ internal fun CompactPillButton(
         primary -> MaterialTheme.colorScheme.onPrimary
         else -> MaterialTheme.colorScheme.onSurface
     }
+    val haptics = rememberHaptics()
     Surface(
-        onClick = onClick,
+        onClick = {
+            haptics.click()
+            onClick()
+        },
         enabled = enabled,
         shape = CircleShape,
         color = container,
@@ -306,10 +312,18 @@ internal fun CompactPillButton(
         tonalElevation = 3.dp,
         shadowElevation = if (primary) 6.dp else 4.dp,
     ) {
-        Box(
-            modifier = Modifier.padding(horizontal = 36.dp, vertical = 14.dp),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier = Modifier.padding(horizontal = 28.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
             Text(
                 text = label,
                 style = MaterialTheme.typography.titleMedium.copy(
@@ -763,8 +777,12 @@ internal fun ArrowPillButton(
                     else MaterialTheme.colorScheme.surfaceContainerHigh
     val content = if (enabled) MaterialTheme.colorScheme.onPrimary
                   else MaterialTheme.colorScheme.onSurfaceVariant
+    val haptics = rememberHaptics()
     Surface(
-        onClick = onClick,
+        onClick = {
+            haptics.click()
+            onClick()
+        },
         enabled = enabled,
         shape = CircleShape,
         color = container,

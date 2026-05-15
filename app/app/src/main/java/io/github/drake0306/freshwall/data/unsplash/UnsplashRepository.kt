@@ -33,7 +33,7 @@ class UnsplashRepository(
             check(isConfigured) { CONFIG_ERROR }
             val encoded = URLEncoder.encode(query, "UTF-8")
             val request = Request.Builder()
-                .url("$BASE_URL/search/photos?query=$encoded&page=$page&per_page=$perPage&orientation=portrait")
+                .url("$BASE_URL/search/photos?query=$encoded&page=$page&per_page=$perPage")
                 .header("Authorization", "Client-ID ${BuildConfig.UNSPLASH_API_KEY}")
                 .header("Accept-Version", "v1")
                 .apply { if (forceFresh) cacheControl(CacheControl.FORCE_NETWORK) }

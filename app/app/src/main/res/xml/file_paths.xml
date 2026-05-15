@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!--
+        Exposes files under context.cacheDir/wallpapers/ as content URIs so we
+        can hand a wallpaper bitmap to the system wallpaper cropper Intent
+        (WallpaperManager.getCropAndSetWallpaperIntent). Scoped to that single
+        subdirectory to keep nothing else in cache reachable to other apps.
+    -->
+    <cache-path
+        name="wallpapers"
+        path="wallpapers/" />
+</paths>

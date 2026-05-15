@@ -31,8 +31,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.drake0306.freshwall.FreshWallApplication
 import io.github.drake0306.freshwall.actions.ApplyTarget
+import io.github.drake0306.freshwall.ads.gateAndRun
 import io.github.drake0306.freshwall.data.AutoRotateSource
 import io.github.drake0306.freshwall.ui.settings.SettingsTopBar
+import io.github.drake0306.freshwall.util.findActivity
+import io.github.drake0306.freshwall.util.rememberHaptics
 import io.github.drake0306.freshwall.work.AutoRotateScheduler
 
 @Composable
@@ -42,11 +45,32 @@ fun AutoRotateScreen(
     val context = LocalContext.current
     val app = remember(context) { context.applicationContext as FreshWallApplication }
     val prefs = app.autoRotatePreferences
+    val adManager = app.rewardedAdManager
+    val activity = remember(context) { context.findActivity() }
     val config by prefs.config.collectAsStateWithLifecycle()
 
     fun update(transform: (io.github.drake0306.freshwall.data.AutoRotateConfig) -> io.github.drake0306.freshwall.data.AutoRotateConfig) {
         prefs.update(transform)
         AutoRotateScheduler.apply(context, prefs.config.value)
+    }
+
+    /**
+     * Gate the enable-flip behind a rewarded ad — opt-in cycles cost the user
+     * a short ad to support the app. Turning OFF is free and instant; we
+     * never want to penalise the user for backing out. If no ad is loaded
+     * yet (cold start, network blip), `gateAndRun` falls through and the
+     * toggle works as-is rather than holding the user hostage.
+     */
+    val haptics = rememberHaptics()
+    fun toggleEnabled(on: Boolean) {
+        haptics.click()
+        if (!on) {
+            update { it.copy(enabled = false) }
+            return
+        }
+        gateAndRun(adManager, activity, context) {
+            update { it.copy(enabled = true) }
+        }
     }
 
     Surface(
@@ -95,10 +119,19 @@ fun AutoRotateScreen(
                     }
                     Switch(
                         checked = config.enabled,
-                        onCheckedChange = { on -> update { it.copy(enabled = on) } },
+                        onCheckedChange = ::toggleEnabled,
                     )
                 }
             }
+
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Powered by a short ad each time you turn this on — keeps " +
+                    "FreshWall free and the wallpapers rotating.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
 
             Spacer(Modifier.height(24.dp))
 
@@ -169,7 +202,10 @@ fun AutoRotateScreen(
                 }
                 Switch(
                     checked = config.wifiOnly,
-                    onCheckedChange = { v -> update { it.copy(wifiOnly = v) } },
+                    onCheckedChange = { v ->
+                        haptics.click()
+                        update { it.copy(wifiOnly = v) }
+                    },
                 )
             }
 
@@ -229,15 +265,20 @@ private fun SingleChoiceRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val haptics = rememberHaptics()
+    val hapticClick = {
+        haptics.click()
+        onClick()
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(onClick = hapticClick)
             .padding(horizontal = 24.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        RadioButton(selected = selected, onClick = onClick)
+        RadioButton(selected = selected, onClick = hapticClick)
         Column(modifier = Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.bodyLarge)
             if (description != null) {
