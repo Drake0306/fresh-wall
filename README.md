@@ -193,7 +193,9 @@ suitable for direct-install testing.
 - AutoRotate's headless apply still uses `WallpaperManager.setBitmap` (the
   system cropper Intent requires UI). That path can still show Android's
   parallax stretch on some OEMs.
-- See `PRE_LAUNCH.md` for what's left before Play Store + Unsplash production.
+- `PRE_LAUNCH.md` tracks what's left before Play Store + Unsplash
+  production. `RELEASE_CHEATSHEET.md` is the build / signing quick-ref.
+  `PLAY_STORE.md` is the full Play Console upload playbook.
 
 ## Contributing
 

@@ -15,7 +15,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done · `[—]` skipped
 (namespace + applicationId), every Kotlin file's `package` / `import`
 statements, the source directory tree under `app/src/main/java/`, plus
 `androidTest/` and `test/` trees. Documentation (`README.md`, `PLAN.md`,
-`PRE_LAUNCH.md`, `CLAUDE.md`, `ONBOARDING_NOTES.md`) updated to reference
+`PRE_LAUNCH.md`, `CLAUDE.md`) updated to reference
 the new path. **Cannot be changed after Play Store publish.**
 
 ### `[x]` 1. Replace AdMob test IDs with real ones
@@ -57,19 +57,17 @@ before testing on hardware.
 without a linked policy.
 
 ### `[~]` 4. Turn on R8 minification + test release build
-**Alpha v1 cut**: `builds/freshwall-alpha-1.0-debug.apk` (29 MB, signed
-debug keystore, installable on any phone) and `freshwall-alpha-1.0-release-UNSIGNED.apk`
-(21 MB, release variant minus signing). Release pipeline confirmed working
-end-to-end; only thing blocking Play Console upload is the release keystore
-(see ALPHA_RELEASE.md Part A). R8 still off pending smoke-test on real device.
+**Beta v1 cut**: `v1.0.0-beta.1` is live on GitHub Releases — signed
+release APK built locally via Android Studio with the `freshwall-release.jks`
+keystore (`do not delete/` at repo root). R8 still off pending a smoke-test
+on real device before promoting to closed/production tracks.
 
 **Old subsection (kept for reference):**
-Signing config is now wired (reads `release.*` keys from `local.properties`).
-CI workflow at `.github/workflows/build.yml` validates every push.
-ALPHA_RELEASE.md has the full playbook for keystore generation, signed AAB
-build, and Play Console internal-test upload. Once you've smoke-tested an
-unsigned-R8-off alpha on your phone, we can flip `isMinifyEnabled = true`
-and run the same flow to verify R8 doesn't break anything.
+Signing config is wired (reads `release.*` keys from `local.properties`).
+See `RELEASE_CHEATSHEET.md` for the build steps and `PLAY_STORE.md` for
+the Play Console upload path. Once you've smoke-tested an
+unminified release on your phone, flip `isMinifyEnabled = true` and run
+the same flow to verify R8 doesn't break anything.
 
 **Old subsection (kept for reference):**
 **Owner**: me (edit gradle, add keep rules) → you (install release APK, walk
