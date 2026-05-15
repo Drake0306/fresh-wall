@@ -16,6 +16,14 @@ build/
 local.properties
 **/local.properties
 
+# Signing keystore folder — holds the release .jks. Lose this and the Play
+# Store listing is bricked (no way to push updates under the same package).
+# Back the keystore up to two more places outside the repo. NEVER commit.
+do not delete/
+**/do not delete/
+*.jks
+*.keystore
+
 # Firebase Android config — per-developer. Stays out of the public repo so
 # anyone forking can drop in their own project's google-services.json.
 google-services.json
@@ -32,6 +40,11 @@ google-services.json
 *.aab
 captures/
 **/captures/
+# Android Studio's "Generate Signed Bundle / APK" wizard drops outputs here
+# (output-metadata.json, baselineProfiles/) alongside the .apk. Ignore the
+# whole dir so nothing accidentally lands in the public repo.
+app/app/release/
+app/app/release-*/
 
 # OS
 .DS_Store
