@@ -396,7 +396,10 @@ internal fun CategoryPickerStep(
             .statusBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        val heroHeight = if (headerAccent is TopHeaderAccent.Combined) 280.dp else 220.dp
+        // Trimmed from 220 / 280 dp so the chip area has more room on
+        // short phones. Combined still gets a bit more because the brand-
+        // tags stack inside it needs vertical space.
+        val heroHeight = if (headerAccent is TopHeaderAccent.Combined) 240.dp else 200.dp
         BackgroundHeader(
             gradientFrom = headerAccent.gradientFrom,
             gradientTo = headerAccent.gradientTo,
@@ -457,13 +460,18 @@ internal fun CategoryPickerStep(
 
         Spacer(Modifier.height(10.dp))
 
-        // Bounded scrollable chip area — narrower (horizontal padding 32dp
-        // versus the older 20dp) and capped at a max height of 300dp so it
-        // doesn't dominate the screen. Long lists scroll *inside* the box.
+        // Weighted scrollable chip area — claims whatever vertical space
+        // is left after the fixed header / title / search / counter /
+        // arrow. On small phones it shrinks down (chips scroll inside);
+        // on large phones the heightIn cap stops it from ballooning.
+        // The earlier hard `heightIn(max = 300.dp)` pushed the bottom
+        // counter + arrow off-screen on short displays because the chip
+        // box refused to shrink.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 300.dp)
+                .weight(1f)
+                .heightIn(max = 360.dp)
                 .padding(horizontal = 32.dp)
                 .clip(RoundedCornerShape(20.dp))
                 .border(
@@ -503,10 +511,10 @@ internal fun CategoryPickerStep(
             }
         }
 
-        // Weighted spacer above + below the counter/arrow group — vertical
-        // centering in the empty space between the chip box and the
-        // navigation bar.
-        Spacer(Modifier.weight(1f))
+        // Fixed gap between chip area and the counter row. The earlier
+        // weighted spacers fought with the chip box for space; on short
+        // screens that resulted in the bottom items getting clipped.
+        Spacer(Modifier.height(14.dp))
 
         val count = orderedSelection.size
         val starCount = starred.size
@@ -531,18 +539,16 @@ internal fun CategoryPickerStep(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
         NextArrowButton(
             onClick = { onNext(selected, starred) },
             enabled = count in MIN_SELECTION..MAX_SELECTION,
         )
 
-        Spacer(Modifier.weight(1f))
-
         Spacer(
             Modifier.height(
                 WindowInsets.navigationBars.asPaddingValues()
-                    .calculateBottomPadding() + 12.dp,
+                    .calculateBottomPadding() + 16.dp,
             ),
         )
     }

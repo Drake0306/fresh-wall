@@ -7,9 +7,11 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
@@ -51,7 +53,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -105,11 +111,12 @@ fun HomeTitleBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            // Small top padding lifts the pill clear of the status bar but
-            // keeps it visually high in the top region; the large bottom
-            // padding opens a clear breathing gap between the pill and the
-            // first row of grid tiles below.
-            .padding(top = 10.dp, bottom = 44.dp),
+            // Top padding zeroed so the pill sits flush against the
+            // status-bar baseline (the parent Column already spaces the
+            // status bar with statusBarTopDp). Bottom padding stays
+            // generous to keep the gap between the pill and the first
+            // row of grid tiles below.
+            .padding(top = 0.dp, bottom = 58.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -221,6 +228,7 @@ private fun CircularNavPill(
     contentDescription: String,
     onClick: () -> Unit,
 ) {
+    // Pill + icon both scaled up ~10% from the original 48dp / 24dp pair.
     Surface(
         onClick = onClick,
         shape = CircleShape,
@@ -228,10 +236,14 @@ private fun CircularNavPill(
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 3.dp,
         shadowElevation = 4.dp,
-        modifier = Modifier.size(48.dp),
+        modifier = Modifier.size(53.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(imageVector = icon, contentDescription = contentDescription)
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(26.dp),
+            )
         }
     }
 }
@@ -286,12 +298,18 @@ private fun TabSegment(
             .clip(CircleShape)
             .background(bg)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            // Touch padding bumped together with the font size so the
+            // tab pills keep a balanced shape after the 10% type increase.
+            .padding(horizontal = 16.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
+            // labelLarge ×1.1 — matches the CircularNavPill icon bump so the
+            // bottom rack reads at one consistent size.
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontSize = MaterialTheme.typography.labelLarge.fontSize * 1.1f,
+            ),
             color = textColor,
         )
     }
@@ -457,9 +475,29 @@ fun WallpaperTile(
     modifier: Modifier = Modifier,
     showSourceBadge: Boolean = false,
 ) {
+    // Viewport-entry pop-in. Each tile's `hasAppeared` flips to true
+    // exactly once per composition — which happens when the tile first
+    // becomes visible (scrolled into view) or when a new page of items
+    // is paginated in. The animateFloatAsState drives a 280ms decelerating
+    // fade-from-zero + slide-up-by-24dp. Subtle but it's the effect
+    // people perceive as "smooth scrolling" in apps like Crisper —
+    // tiles materialise instead of snapping into place, which masks the
+    // brief beat where the Coil image is still decoding.
+    var hasAppeared by remember(wallpaper.id) { mutableStateOf(false) }
+    val entryProgress by animateFloatAsState(
+        targetValue = if (hasAppeared) 1f else 0f,
+        animationSpec = tween(durationMillis = 280, easing = LinearOutSlowInEasing),
+        label = "tile-entry",
+    )
+    LaunchedEffect(wallpaper.id) { hasAppeared = true }
+
     with(sharedTransitionScope) {
         Box(
             modifier = modifier
+                .graphicsLayer {
+                    alpha = entryProgress
+                    translationY = (1f - entryProgress) * 24.dp.toPx()
+                }
                 .aspectRatio(9f / 16f)
                 .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)

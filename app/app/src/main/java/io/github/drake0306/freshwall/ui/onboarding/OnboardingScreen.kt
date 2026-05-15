@@ -25,9 +25,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -429,6 +431,12 @@ private fun ModeSelectStep(
     backgroundImageUrl: String,
     onCombined: () -> Unit,
     onSeparate: () -> Unit,
+    /**
+     * When non-null, the button matching this mode shows a small
+     * "Currently set" label underneath so users re-entering the
+     * editor immediately see their previous choice. Null in onboarding.
+     */
+    currentMode: CustomizationMode? = null,
 ) {
     Column(
         modifier = Modifier
@@ -469,15 +477,38 @@ private fun ModeSelectStep(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            CompactPillButton(
+            ModeOption(
                 label = "Same for both",
                 onClick = onCombined,
                 primary = true,
+                isCurrent = currentMode == CustomizationMode.COMBINED,
             )
-            CompactPillButton(
+            ModeOption(
                 label = "Customize each",
                 onClick = onSeparate,
                 primary = false,
+                isCurrent = currentMode == CustomizationMode.SEPARATE,
+            )
+        }
+    }
+}
+
+/** Pill button + optional "Currently set" hint when this is the saved mode. */
+@Composable
+private fun ModeOption(
+    label: String,
+    onClick: () -> Unit,
+    primary: Boolean,
+    isCurrent: Boolean,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        CompactPillButton(label = label, onClick = onClick, primary = primary)
+        if (isCurrent) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Currently set",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
     }
@@ -541,6 +572,37 @@ fun CategoryEditorScreen(
         mutableStateOf(current.unsplashStarred.toSet())
     }
 
+    // The saved mode the user committed to last time. Distinct from `mode`
+    // (the editor's working draft, which may change as they tap around).
+    val savedMode = current.mode
+
+    // When non-null, the user has tapped a mode different from `savedMode`
+    // and the confirmation dialog is showing.
+    var pendingModeSwitch by remember { mutableStateOf<CustomizationMode?>(null) }
+
+    /** Apply a confirmed mode switch: clear the picker state for the new
+     *  mode (so the user starts fresh) and advance to its first picker. */
+    fun commitModeSwitch(target: CustomizationMode) {
+        when (target) {
+            CustomizationMode.COMBINED -> {
+                combinedSelection = emptySet()
+                combinedStarred = emptySet()
+            }
+            CustomizationMode.SEPARATE -> {
+                pexelsSelection = emptySet()
+                pexelsStarred = emptySet()
+                unsplashSelection = emptySet()
+                unsplashStarred = emptySet()
+            }
+        }
+        mode = target
+        step = if (target == CustomizationMode.COMBINED) {
+            EditorStep.CombinedPicker
+        } else {
+            EditorStep.PexelsPicker
+        }
+    }
+
     val modeSelectBg = remember { MOUNTAIN_IMAGE_URLS.random() }
     val combinedBg = remember { MOUNTAIN_IMAGE_URLS.random() }
     val pexelsBg = remember { MOUNTAIN_IMAGE_URLS.random() }
@@ -589,13 +651,22 @@ fun CategoryEditorScreen(
             when (current) {
                 EditorStep.ModeSelect -> ModeSelectStep(
                     backgroundImageUrl = modeSelectBg,
+                    currentMode = savedMode,
                     onCombined = {
-                        mode = CustomizationMode.COMBINED
-                        step = EditorStep.CombinedPicker
+                        if (savedMode == CustomizationMode.COMBINED) {
+                            mode = CustomizationMode.COMBINED
+                            step = EditorStep.CombinedPicker
+                        } else {
+                            pendingModeSwitch = CustomizationMode.COMBINED
+                        }
                     },
                     onSeparate = {
-                        mode = CustomizationMode.SEPARATE
-                        step = EditorStep.PexelsPicker
+                        if (savedMode == CustomizationMode.SEPARATE) {
+                            mode = CustomizationMode.SEPARATE
+                            step = EditorStep.PexelsPicker
+                        } else {
+                            pendingModeSwitch = CustomizationMode.SEPARATE
+                        }
                     },
                 )
 
@@ -639,6 +710,40 @@ fun CategoryEditorScreen(
                 )
             }
         }
+    }
+
+    // Confirmation when the user picks a mode different from what they
+    // previously saved. "Switch and reset" wipes the new mode's working
+    // selections so the picker starts blank; "Cancel" keeps them on the
+    // mode-select step with no changes applied.
+    pendingModeSwitch?.let { target ->
+        val targetLabel = when (target) {
+            CustomizationMode.COMBINED -> "Same for both"
+            CustomizationMode.SEPARATE -> "Customize each"
+        }
+        AlertDialog(
+            onDismissRequest = { pendingModeSwitch = null },
+            title = { Text("Switch to \"$targetLabel\"?") },
+            text = {
+                Text(
+                    "You previously picked the other option. Switching will reset " +
+                        "those picks — you'll choose your categories again on the " +
+                        "next screen.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        commitModeSwitch(target)
+                        pendingModeSwitch = null
+                    },
+                ) { Text("Switch and reset") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingModeSwitch = null }) { Text("Cancel") }
+            },
+        )
     }
 }
 

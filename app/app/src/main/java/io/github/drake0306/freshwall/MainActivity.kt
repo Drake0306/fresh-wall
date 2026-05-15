@@ -1,5 +1,6 @@
 package io.github.drake0306.freshwall
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -70,6 +71,31 @@ class MainActivity : ComponentActivity() {
                     FreshWallApp()
                 }
             }
+        }
+    }
+
+    /**
+     * Pin the window to the panel's highest refresh-rate mode (90 / 120 /
+     * 144 Hz on capable phones). Without this opt-in the OS commonly keeps
+     * Compose surfaces at 60 Hz even on high-refresh panels, which is the
+     * usual culprit when scroll feels choppier than other apps. Pixel
+     * launcher, YouTube, etc. all set this hint.
+     *
+     * Safe-fallback: if for any reason we can't enumerate modes (rare —
+     * mostly emulators), we leave the OS default in place rather than
+     * crashing.
+     */
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display
+        } else {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay
+        } ?: return
+        val highest = display.supportedModes.maxByOrNull { it.refreshRate } ?: return
+        window.attributes = window.attributes.apply {
+            preferredDisplayModeId = highest.modeId
         }
     }
 }
