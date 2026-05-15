@@ -15,7 +15,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 
-private const val PAGE_SIZE = 9
+// 24 fits a 3-col grid with 8 rows per page. Pexels caps per_page at 80
+// so we still have headroom; bigger pages cut pagination calls ~3x for
+// scroll-heavy users.
+private const val PAGE_SIZE = 24
 
 data class PexelsHomeUiState(
     val wallpapers: List<Wallpaper> = emptyList(),
@@ -61,12 +64,12 @@ class PexelsHomeViewModel(application: Application) : AndroidViewModel(applicati
         return pool.randomOrNull()
     }
 
-    private suspend fun fetchPage(page: Int): Result<List<Wallpaper>> {
+    private suspend fun fetchPage(page: Int, forceFresh: Boolean = false): Result<List<Wallpaper>> {
         val category = activeCategory
         return if (category == null) {
-            repository.curated(page = page, perPage = PAGE_SIZE)
+            repository.curated(page = page, perPage = PAGE_SIZE, forceFresh = forceFresh)
         } else {
-            repository.search(category, page = page, perPage = PAGE_SIZE)
+            repository.search(category, page = page, perPage = PAGE_SIZE, forceFresh = forceFresh)
         }
     }
 
@@ -111,7 +114,7 @@ class PexelsHomeViewModel(application: Application) : AndroidViewModel(applicati
             _uiState.update { it.copy(isRefreshing = true, error = null) }
             activeCategory = chooseCategory()
             currentPage = 0
-            val outcome = fetchPage(page = 1)
+            val outcome = fetchPage(page = 1, forceFresh = true)
             outcome
                 .onSuccess { list ->
                     currentPage = 1

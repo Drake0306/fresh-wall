@@ -6,6 +6,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLEncoder
@@ -21,6 +22,7 @@ class PexelsRepository(
         query: String,
         page: Int = 1,
         perPage: Int = DEFAULT_PER_PAGE,
+        forceFresh: Boolean = false,
     ): Result<List<Wallpaper>> = withContext(Dispatchers.IO) {
         cancellationAwareCatch {
             check(isConfigured) { CONFIG_ERROR }
@@ -28,6 +30,7 @@ class PexelsRepository(
             val request = Request.Builder()
                 .url("$BASE_URL/search?query=$encoded&page=$page&per_page=$perPage&orientation=portrait")
                 .header("Authorization", BuildConfig.PEXELS_API_KEY)
+                .apply { if (forceFresh) cacheControl(CacheControl.FORCE_NETWORK) }
                 .build()
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) error(httpErrorMessage(response.code))
@@ -40,12 +43,14 @@ class PexelsRepository(
     suspend fun curated(
         page: Int = 1,
         perPage: Int = DEFAULT_PER_PAGE,
+        forceFresh: Boolean = false,
     ): Result<List<Wallpaper>> = withContext(Dispatchers.IO) {
         cancellationAwareCatch {
             check(isConfigured) { CONFIG_ERROR }
             val request = Request.Builder()
                 .url("$BASE_URL/curated?page=$page&per_page=$perPage")
                 .header("Authorization", BuildConfig.PEXELS_API_KEY)
+                .apply { if (forceFresh) cacheControl(CacheControl.FORCE_NETWORK) }
                 .build()
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) error(httpErrorMessage(response.code))

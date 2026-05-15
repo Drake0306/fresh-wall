@@ -114,8 +114,9 @@ private fun FreshWallApp() {
         if (screenStack.size > 1) screenStack = screenStack.dropLast(1)
     }
 
-    // Block system back during onboarding so users can't accidentally
-    // bail mid-customization. Everywhere else, back pops the stack.
+    // Onboarding handles its own back internally (step → previous step;
+    // back from the very first step falls through to exit the app).
+    // Everywhere else, back pops the screen stack.
     BackHandler(enabled = currentScreen !is Screen.Onboarding && screenStack.size > 1) {
         goBack()
     }

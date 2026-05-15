@@ -29,7 +29,7 @@ class AutoRotateWorker(
 
         val pick = candidates.random()
         val applied = app.wallpaperActions.setAsWallpaper(
-            url = pick.fullUrl,
+            wallpaper = pick,
             target = config.target,
             crop = null,
         )

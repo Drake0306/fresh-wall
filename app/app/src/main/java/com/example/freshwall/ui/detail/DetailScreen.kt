@@ -413,7 +413,7 @@ private suspend fun runApply(
     crop: CropTransform?,
     context: android.content.Context,
 ) {
-    val result = actions.setAsWallpaper(wallpaper.fullUrl, target, crop)
+    val result = actions.setAsWallpaper(wallpaper, target, crop)
     val msg = if (result.isSuccess) "Wallpaper applied" else "Failed to apply wallpaper"
     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
 }
@@ -423,7 +423,7 @@ private suspend fun runDownload(
     wallpaper: Wallpaper,
     context: android.content.Context,
 ) {
-    val result = actions.downloadToGallery(wallpaper.fullUrl, "freshwall-${wallpaper.id}")
+    val result = actions.downloadToGallery(wallpaper, "freshwall-${wallpaper.id}")
     val msg = if (result.isSuccess) "Saved to gallery" else "Download failed"
     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
 }

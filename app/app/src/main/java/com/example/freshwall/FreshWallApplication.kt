@@ -15,11 +15,13 @@ import com.example.freshwall.data.SourcePreferences
 import com.example.freshwall.data.ThemePreferences
 import com.example.freshwall.data.feedback.FeedbackRepository
 import com.example.freshwall.data.manifest.RemoteWallpaperRepository
+import com.example.freshwall.data.net.ApiCacheControlInterceptor
 import com.example.freshwall.data.net.RetryInterceptor
 import com.example.freshwall.data.pexels.PexelsRepository
 import com.example.freshwall.data.unsplash.UnsplashRepository
 import com.example.freshwall.work.AutoRotateScheduler
 import com.google.android.gms.ads.MobileAds
+import okhttp3.Cache
 import okhttp3.OkHttpClient
 
 class FreshWallApplication : Application(), ImageLoaderFactory {
@@ -28,10 +30,12 @@ class FreshWallApplication : Application(), ImageLoaderFactory {
     val themePreferences: ThemePreferences by lazy { ThemePreferences(this) }
     val favoritesManager: FavoritesManager by lazy { FavoritesManager(this) }
     val autoRotatePreferences: AutoRotatePreferences by lazy { AutoRotatePreferences(this) }
-    val wallpaperActions: WallpaperActions by lazy { WallpaperActions(this) }
     val searchHistoryManager: SearchHistoryManager by lazy { SearchHistoryManager(this) }
     val pexelsRepository: PexelsRepository by lazy { PexelsRepository(httpClient = sharedHttpClient) }
     val unsplashRepository: UnsplashRepository by lazy { UnsplashRepository(httpClient = sharedHttpClient) }
+    val wallpaperActions: WallpaperActions by lazy {
+        WallpaperActions(this, unsplashRepository)
+    }
     val feedbackRepository: FeedbackRepository by lazy { FeedbackRepository(this) }
     val sourcePreferences: SourcePreferences by lazy { SourcePreferences(this) }
     val categoryPreferences: CategoryPreferences by lazy { CategoryPreferences(this) }
@@ -39,11 +43,22 @@ class FreshWallApplication : Application(), ImageLoaderFactory {
         RemoteWallpaperRepository(this, sharedHttpClient)
     }
 
-    // Single OkHttpClient shared by Coil + PexelsRepository so the retry
-    // interceptor covers BOTH image loads and JSON API calls in one place.
+    // Single OkHttpClient shared by Coil + the API repositories. The disk
+    // cache + ApiCacheControlInterceptor mean repeated grid loads (cold
+    // starts, tab toggles) are served from disk for an hour instead of
+    // re-hitting the per-key Pexels / Unsplash hourly quotas. The cache is
+    // scoped to api.* hosts — image CDN traffic still flows through Coil's
+    // own DiskCache.
     private val sharedHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .addInterceptor(RetryInterceptor())
+            .addNetworkInterceptor(ApiCacheControlInterceptor())
+            .cache(
+                Cache(
+                    directory = cacheDir.resolve("http_api_cache"),
+                    maxSize = 50L * 1024 * 1024,
+                ),
+            )
             .build()
     }
 

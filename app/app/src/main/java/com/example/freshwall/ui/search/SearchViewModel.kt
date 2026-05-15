@@ -16,7 +16,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 
-internal const val SEARCH_PAGE_SIZE = 9
+// Matches the home tabs' PAGE_SIZE — 24 per page. Unsplash caps per_page
+// at 30, so this stays within both APIs' limits.
+internal const val SEARCH_PAGE_SIZE = 24
 
 /**
  * Per-source result state (Pexels and Unsplash both use this shape). The

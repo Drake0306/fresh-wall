@@ -1,22 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-
-    <!-- Back card (lightest) -->
-    <path
-        android:fillColor="#D0BCFF"
-        android:pathData="M62,30 H82 A4,4 0 0 1 86,34 V82 A4,4 0 0 1 82,86 H62 A4,4 0 0 1 58,82 V34 A4,4 0 0 1 62,30 Z" />
-
-    <!-- Middle card -->
-    <path
-        android:fillColor="#9F8FE3"
-        android:pathData="M44,26 H64 A4,4 0 0 1 68,30 V78 A4,4 0 0 1 64,82 H44 A4,4 0 0 1 40,78 V30 A4,4 0 0 1 44,26 Z" />
-
-    <!-- Front card (primary) -->
-    <path
-        android:fillColor="#6750A4"
-        android:pathData="M26,22 H46 A4,4 0 0 1 50,26 V74 A4,4 0 0 1 46,78 H26 A4,4 0 0 1 22,74 V26 A4,4 0 0 1 26,22 Z" />
-</vector>
+<!--
+  Android 12+ splash screen icon. Bitmap is already tight-cropped to the
+  rounded-square logo, so we render it edge-to-edge inside the system's
+  icon container — no inset, no white halo.
+-->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/app_logo"
+    android:gravity="fill" />

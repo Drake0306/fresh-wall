@@ -32,6 +32,34 @@ data class Wallpaper(
     val fileSize: Long? = null,
     /** ISO-8601 timestamp the wallpaper was added to the catalog. */
     val uploadedAt: String? = null,
+
+    // ── Rich attribution (Unsplash carries all of these; Pexels only
+    // ── populates author/authorUrl above; manifest leaves them null).
+    /** Photographer handle (no `@` prefix), e.g. `"johndoe"`. */
+    val authorUsername: String? = null,
+    /** Short photographer bio. */
+    val authorBio: String? = null,
+    /** Photographer free-form location string. */
+    val authorLocation: String? = null,
+    /** Photographer avatar/profile-picture URL. */
+    val authorAvatarUrl: String? = null,
+    /** Photographer's portfolio site. */
+    val authorPortfolioUrl: String? = null,
+    /** Photographer's Instagram handle (no `@`). */
+    val authorInstagram: String? = null,
+    /** Photographer's Twitter / X handle (no `@`). */
+    val authorTwitter: String? = null,
+    /** Like count on the source platform, when exposed. */
+    val likes: Int? = null,
+    /** Dominant hex color (e.g. `"#A1B2C3"`) — used as a load-time placeholder. */
+    val dominantColor: String? = null,
+
+    /**
+     * Source-specific URL the app must hit to register an apply/download
+     * event (currently only Unsplash — its API Guidelines require it). The
+     * client fires a GET against this URL once per successful user action.
+     */
+    val trackingDownloadUrl: String? = null,
 ) {
     val displayName: String get() = name ?: "Wallpaper $id"
 }

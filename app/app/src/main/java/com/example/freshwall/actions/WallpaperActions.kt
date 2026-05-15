@@ -14,6 +14,8 @@ import android.provider.MediaStore
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
+import com.example.freshwall.data.Wallpaper
+import com.example.freshwall.data.unsplash.UnsplashRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -35,19 +37,22 @@ data class CropTransform(
     val offsetY: Float,
 )
 
-class WallpaperActions(private val context: Context) {
+class WallpaperActions(
+    private val context: Context,
+    private val unsplashRepository: UnsplashRepository,
+) {
 
     // Reuse the app-wide Coil singleton so this work shares the memory+disk cache
     // with the grid's AsyncImage loads (and doesn't double-allocate caches).
     private val imageLoader get() = context.imageLoader
 
     suspend fun setAsWallpaper(
-        url: String,
+        wallpaper: Wallpaper,
         target: ApplyTarget,
         crop: CropTransform? = null,
     ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val source = loadBitmap(url)
+            val source = loadBitmap(wallpaper.fullUrl)
             val finalBitmap = crop?.takeIf { it.viewWidth > 0 && it.viewHeight > 0 }
                 ?.let { renderTransformedBitmap(source, it) }
                 ?: source
@@ -63,13 +68,15 @@ class WallpaperActions(private val context: Context) {
                 )
             }
             Unit
+        }.also { result ->
+            if (result.isSuccess) fireTrackingHit(wallpaper)
         }
     }
 
-    suspend fun downloadToGallery(url: String, fileName: String): Result<Unit> =
+    suspend fun downloadToGallery(wallpaper: Wallpaper, fileName: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val bitmap = loadBitmap(url)
+                val bitmap = loadBitmap(wallpaper.fullUrl)
                 val resolver = context.contentResolver
                 val values = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, "$fileName.jpg")
@@ -88,8 +95,20 @@ class WallpaperActions(private val context: Context) {
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
                 }
                 Unit
+            }.also { result ->
+                if (result.isSuccess) fireTrackingHit(wallpaper)
             }
         }
+
+    /**
+     * Sends the per-source "user used this photo" event. Currently only
+     * Unsplash exposes such an endpoint (and requires it). Fire-and-forget —
+     * never blocks or surfaces an error to the caller.
+     */
+    private suspend fun fireTrackingHit(wallpaper: Wallpaper) {
+        val url = wallpaper.trackingDownloadUrl ?: return
+        unsplashRepository.trackDownload(url)
+    }
 
     private suspend fun loadBitmap(url: String): Bitmap {
         val request = ImageRequest.Builder(context)

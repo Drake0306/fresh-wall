@@ -6,6 +6,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLEncoder
@@ -26,6 +27,7 @@ class UnsplashRepository(
         query: String,
         page: Int = 1,
         perPage: Int = DEFAULT_PER_PAGE,
+        forceFresh: Boolean = false,
     ): Result<List<Wallpaper>> = withContext(Dispatchers.IO) {
         cancellationAwareCatch {
             check(isConfigured) { CONFIG_ERROR }
@@ -34,6 +36,7 @@ class UnsplashRepository(
                 .url("$BASE_URL/search/photos?query=$encoded&page=$page&per_page=$perPage&orientation=portrait")
                 .header("Authorization", "Client-ID ${BuildConfig.UNSPLASH_API_KEY}")
                 .header("Accept-Version", "v1")
+                .apply { if (forceFresh) cacheControl(CacheControl.FORCE_NETWORK) }
                 .build()
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) error(httpErrorMessage(response.code))
@@ -52,6 +55,7 @@ class UnsplashRepository(
     suspend fun popular(
         page: Int = 1,
         perPage: Int = DEFAULT_PER_PAGE,
+        forceFresh: Boolean = false,
     ): Result<List<Wallpaper>> = withContext(Dispatchers.IO) {
         cancellationAwareCatch {
             check(isConfigured) { CONFIG_ERROR }
@@ -59,6 +63,7 @@ class UnsplashRepository(
                 .url("$BASE_URL/photos?page=$page&per_page=$perPage&order_by=popular")
                 .header("Authorization", "Client-ID ${BuildConfig.UNSPLASH_API_KEY}")
                 .header("Accept-Version", "v1")
+                .apply { if (forceFresh) cacheControl(CacheControl.FORCE_NETWORK) }
                 .build()
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) error(httpErrorMessage(response.code))
@@ -68,6 +73,37 @@ class UnsplashRepository(
                 json.decodeFromString<List<UnsplashPhoto>>(body)
                     .map { it.toWallpaper() }
             }
+        }
+    }
+
+    /**
+     * Pings Unsplash's per-photo `download_location` URL after the user
+     * applies or saves an Unsplash photo. Required by the API Guidelines —
+     * Unsplash uses this to credit photographers and gate API access. The
+     * call is best-effort: any failure (network, auth, etc.) is swallowed
+     * because the user-facing action has already succeeded.
+     *
+     * Pass the raw URL captured under `links.download_location` on the
+     * photo response, NOT a hand-built URL.
+     */
+    suspend fun trackDownload(downloadLocation: String): Unit = withContext(Dispatchers.IO) {
+        if (!isConfigured || downloadLocation.isBlank()) return@withContext
+        try {
+            val request = Request.Builder()
+                .url(downloadLocation)
+                .header("Authorization", "Client-ID ${BuildConfig.UNSPLASH_API_KEY}")
+                .header("Accept-Version", "v1")
+                // Tracking pings must always reach Unsplash — never read or
+                // store this in the shared HTTP cache, otherwise replay'd
+                // hits stop counting toward photographer attribution.
+                .cacheControl(CacheControl.Builder().noStore().build())
+                .build()
+            // Body is intentionally discarded — Unsplash just counts the hit.
+            httpClient.newCall(request).execute().close()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            // Best-effort tracking; never surface failures to the user.
         }
     }
 

@@ -35,14 +35,14 @@ before submitting to the Play Store.
 
 ## 2. Branding & visual polish
 
-- **Real launcher icon** — currently the default Android Studio robot.
-  Android Studio → File → New → Image Asset → Launcher Icons (Adaptive and
-  Legacy). Replaces files under `app/src/main/res/mipmap-*`.
-- **Real splash logo** — currently a placeholder vector (three rounded
-  stacked cards in purple) at `app/src/main/res/drawable/splash_logo.xml`.
-  Replace with your real logo. Vector, 108×108 dp viewport, content in the
-  inner 72-dp safe area.
-- **Verify app name** — `app/src/main/res/values/strings.xml`, `app_name`.
+- ~~**Real launcher icon**~~ — DONE. Mipmap PNGs at every density were
+  regenerated from the FreshWall mountain logo (transparent corners). The
+  adaptive icon foreground (`drawable/ic_launcher_foreground.xml`) insets
+  `@drawable/app_logo` into the 72-dp safe area; background is solid cream.
+- ~~**Real splash logo**~~ — DONE. `drawable/splash_logo.xml` is now an
+  inset wrapper over `@drawable/app_logo`. Splash background still
+  `splash_background = #FFFFFFFF` (white); revisit if it clashes.
+- ~~**Verify app name**~~ — DONE. `app_name` already reads `FreshWall`.
 - **Real About page content** —
   `app/src/main/java/com/example/freshwall/ui/settings/AboutScreen.kt`.
   Currently shows "Version 1.0" + "Wallpapers, curated." Add real

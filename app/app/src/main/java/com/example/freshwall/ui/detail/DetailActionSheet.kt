@@ -41,12 +41,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.freshwall.actions.ApplyTarget
 import com.example.freshwall.data.Wallpaper
 
@@ -88,7 +90,11 @@ internal fun DetailActionSheet(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                PhotographerAvatar(name = wallpaper.author, size = 36.dp)
+                PhotographerAvatar(
+                    avatarUrl = wallpaper.authorAvatarUrl,
+                    name = wallpaper.author,
+                    size = 36.dp,
+                )
                 Spacer(Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -218,33 +224,41 @@ internal fun DownloadConfirmDialog(
 }
 
 /**
- * Default photographer avatar. Pexels doesn't expose a photographer photo
- * URL, so we render a Material-style "no photo" placeholder: a neutral
- * surfaceVariant circle with a Person silhouette inside. Same pattern most
- * Google apps use when a profile photo is missing.
- *
- * `name` is intentionally unused right now — kept on the signature so
- * callers don't have to change if/when we add a real avatar URL later.
+ * Photographer avatar. Renders the real profile photo from [avatarUrl] when
+ * present (Unsplash exposes one per photo); falls back to a Material-style
+ * "no photo" placeholder otherwise — a neutral surfaceVariant circle with a
+ * Person silhouette inside.
  */
 @Composable
 internal fun PhotographerAvatar(
-    @Suppress("UNUSED_PARAMETER") name: String?,
+    avatarUrl: String?,
+    name: String?,
     size: Dp,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Person,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(size * 0.7f),
+    val avatarModifier = modifier
+        .size(size)
+        .clip(CircleShape)
+        .background(MaterialTheme.colorScheme.surfaceVariant)
+    if (!avatarUrl.isNullOrBlank()) {
+        AsyncImage(
+            model = avatarUrl,
+            contentDescription = name?.let { "$it's profile picture" },
+            contentScale = ContentScale.Crop,
+            modifier = avatarModifier,
         )
+    } else {
+        Box(
+            modifier = avatarModifier,
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Person,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(size * 0.7f),
+            )
+        }
     }
 }
 
